@@ -6,16 +6,13 @@
 
 #include "parallelSpmv.h"
 
-#define ROW_LOW(id,p,n)  ((id)*(n)/(p))
-#define ROW_HIGH(id,p,n) ((ROW_LOW((id)+1,p,n)-1) + 1)
-
-
 #define FATAL(msg) \
     do {\
         fprintf(stderr, "[%s:%d] %s\n", __FILE__, __LINE__, msg);\
         exit(-1);\
     } while(0)
 
+#define MAXTHREADS 128
 #define REP 1000
 
 #ifdef DOUBLE
@@ -26,115 +23,99 @@
     texture<float> valTex;
 #endif
 
-                     
-real calculateSD(real *data, int n)
+void meanAndSd(real *mean, real *sd,real *data, int n)
 {
     real sum = (real) 0.0; 
-    real mean;
     real standardDeviation = (real) 0.0;
 
     for(int i=0; i<n; ++i) {
         sum += data[i];
     } // end for //
 
-    mean = sum/n;
+    *mean = sum/n;
 
     for(int i=0; i<n; ++i) {
-        standardDeviation += pow(data[i] - mean, 2);
+        standardDeviation += pow(data[i] - *mean, 2);
     } // end for //
-
-    return sqrt(standardDeviation/n);
+    *sd=sqrt(standardDeviation/n);
 } // end of calculateSD //
 
 
 int main(int argc, char *argv[]) 
 {
  
-    //int provided;
-    //MPI_Init_thread(&argc, &argv, MPI_THREAD_SINGLE, &provided);
-
-    const int root=0;
-    int worldRank=0;
-    //MPI_Comm_rank(MPI_COMM_WORLD,&worldRank);
-    //MPI_Comm_size(MPI_COMM_WORLD,&worldSize);
-    
     #include "parallelSpmvData.h"
 
     // verifing number of input parameters //
    char exists='t';
    char checkSol='f';
-    if (worldRank == root) {
-        if (argc < 3 ) {
-            printf("Use: %s  Matrix_filename InputVector_filename  [SolutionVector_filename]  \n", argv[0]);     
-            exists='f';
-        } // endif //
-        
-        FILE *fh=NULL;
-        // testing if matrix file exists
-        if((fh = fopen(argv[1], "rb")  )   == NULL) {
-            printf("No matrix file found.\n");
-            exists='f';
-        } // end if //
-        
-        // testing if input file exists
-        if((fh = fopen(argv[2], "rb")  )   == NULL) {
-            printf("No input vector file found.\n");
-            exists='f';
-        } // end if //
-
-        // testing if output file exists
-        if (argc  >3 ) {
-            if((fh = fopen(argv[3], "rb")  )   == NULL) {
-                printf("No output vector file found.\n");
-                exists='f';
-            } else {
-                checkSol='t';
-            } // end if //
-        } // end if //
-        if (fh) fclose(fh);
+    
+    if (argc < 3 ) {
+        printf("Use: %s  Matrix_filename InputVector_filename  [SolutionVector_filename  [# of streams] ]  \n", argv[0]);     
+        exists='f';
+    } // endif //
+    
+    FILE *fh=NULL;
+    // testing if matrix file exists
+    if((fh = fopen(argv[1], "rb")  )   == NULL) {
+        printf("No matrix file found.\n");
+        exists='f';
     } // end if //
-    //MPI_Bcast(&exists,  1,MPI_CHAR,root,MPI_COMM_WORLD);
+    
+    // testing if input file exists
+    if((fh = fopen(argv[2], "rb")  )   == NULL) {
+        printf("No input vector file found.\n");
+        exists='f';
+    } // end if //
+
+    // testing if output file exists
+    if (argc  >3 ) {
+        if((fh = fopen(argv[3], "rb")  ) == NULL) {
+            printf("No output vector file found.\n");
+            exists='f';
+        } else {
+            checkSol='t';
+        } // end if //
+    } // end if //
+
+    if (argc  > 4 ) {
+        nStreams = atoi(argv[4]);
+    } // end if //
+    
+    if (fh) fclose(fh);
+    
     if (exists == 'f') {
-        if (worldRank == root) printf("Quitting.....\n");
-        //MPI_Finalize();
+        printf("Quitting.....\n");
         exit(0);
     } // end if //
-    //MPI_Bcast(&checkSol,1,MPI_CHAR,root,MPI_COMM_WORLD);
-
     
-    reader(&n_global,&nnz_global, &n, 
-           &off_proc_nnz,
+    printf("Solving using %d streams\n", nStreams);
+
+    stream= (cudaStream_t *) malloc(sizeof(cudaStream_t) * nStreams);
+    
+    starRow = (int *) malloc(sizeof(int) * nStreams+1); 
+    starRow[0]=0;
+    reader(&n_global,&nnz_global, starRow, 
            &row_ptr,&col_idx,&val,
-           &row_ptr_off,&col_idx_off,&val_off,
-           argv[1], root);
+           argv[1], nStreams);
+    
     
     // ready to start //    
     cudaError_t cuda_ret;
-
-
+    
     real *w=NULL;
     real *v=NULL; // <-- input vector to be shared later
     //real *v_off=NULL; // <-- input vector to be shared later
     
     
-    v     = (real *) malloc(n*sizeof(real));
-    w     = (real *) malloc(n*sizeof(real)); 
-    //v_off = (real *) malloc((nColsOff)*sizeof(real));
+    v     = (real *) malloc(n_global*sizeof(real));
+    w     = (real *) malloc(n_global*sizeof(real)); 
 
     // reading input vector
-    vectorReader(v, &n, argv[2]);
+    vectorReader(v, &n_global, argv[2]);
 //////////////////////////////////////
 // cuda stuff start here
 
-    /////////////////////////////////////////////////////
-    // determining the standard deviation of the nnz per row
-    real *temp=(real *) malloc((n_global)*sizeof(real));
-    for (int row=0; row<n_global; ++row) {
-        temp[row] = row_ptr[row+1] - row_ptr[row];
-    } // end for //
-    real sd=calculateSD(temp,n_global);
-    free(temp);
-    /////////////////////////////////////////////////////
 
     int *rows_d, *cols_d;
     real *vals_d;
@@ -174,22 +155,68 @@ int main(int argc, char *argv[])
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix x_d");
 
 
-    real meanNnzPerRow = ((real) nnz_global) / (n_global);
-
     const int basicSize = 32;
-    dim3 block(basicSize);
-    size_t sharedMemorySize=0;
     const real parameter2Adjust = 0.5;
-    dim3 grid;
-
     
-    //printf("%d, %d, %d \n", grid.x, block.x, block.y); exit(0);
+
+    meanNnzPerRow = (real*) malloc(nStreams*sizeof(real));
+    sd            = (real*) malloc(nStreams*sizeof(real ));
+    block = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
+    grid  = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
+    sharedMemorySize = (size_t *) calloc(nStreams, sizeof(size_t)); 
 
     for (int s=0; s<nStreams; ++s) {
+        block[s].x = basicSize;
+        block[s].y = 1;
+        block[s].z = 1;
+        grid[s].x = 1;
+        grid[s].y = 1;
+        grid[s].z = 1;
+    } // end for //
+
+
+
+
+    for (int s=0; s<nStreams; ++s) {
+        int nrows = starRow[s+1]-starRow[s];
+        /////////////////////////////////////////////////////
+        // determining the standard deviation of the nnz per row
+        real *temp=(real *) calloc(nrows,sizeof(real));
+        
+        for (int row=starRow[s], i=0; row<starRow[s]+nrows; ++row, ++i) {
+            temp[i] = row_ptr[row+1] - row_ptr[row];
+        } // end for //
+        meanAndSd(&meanNnzPerRow[s],&sd[s],temp, nrows);
+        //printf("file: %s, line: %d, gpu on-prcoc:   %d, mean: %7.3f, sd: %7.3f using: %s\n", __FILE__, __LINE__, s , meanNnzPerRow[s], sd[s], (meanNnzPerRow[s] + 0.5*sd[s] < 32) ? "spmv0": "spmv1" );
+        free(temp);
+        /////////////////////////////////////////////////////
+
         //cuda_ret = cudaStreamCreateWithFlags(&stream0[gpu], cudaStreamDefault);
         cuda_ret = cudaStreamCreateWithFlags(&stream[s], cudaStreamNonBlocking ) ;
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
+
+        
+        printf("In Stream: %d\n",s);
+        if (meanNnzPerRow[s] + parameter2Adjust*sd[s] < basicSize) {
+        	// these mean use scalar spmv
+            grid[s].x = (   (  nrows + block[s].x -1) /block[s].x );
+            printf("using scalar spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
+        } else {
+            // these mean use vector spmv
+            if (meanNnzPerRow[s] >= 2*basicSize) {
+                block[s].x = 2*basicSize;
+            } // end if //
+            block[s].y=MAXTHREADS/block[s].x;
+            grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
+        	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
+            printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
+        } // end if // 
+
     } // end for //
+    
+    
+    //printf("%d, %d, %d \n", grid.x, block.x, block.y); exit(0);
+
 
     // Timing should begin here//
     struct timeval tp;                                   // timer
@@ -197,10 +224,6 @@ int main(int argc, char *argv[])
     
     gettimeofday(&tp,NULL);  // Unix timer
     elapsed_time = -(tp.tv_sec*1.0e6 + tp.tv_usec);
-    
-    const int rowsPerStream  =  (n_global + nStreams-1)/nStreams;
-    
-
     for (int t=0; t<REP; ++t) {
 
         cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(real) );
@@ -208,41 +231,22 @@ int main(int argc, char *argv[])
         
         
         for (int s=0; s<nStreams; ++s) {
- 
-            const int sRow = ROW_LOW (s,nStreams,n_global);
-            const int nrows = ROW_HIGH(s,nStreams,n_global) - sRow;
-            //printf("new s: %d,sRow:%d, nRows:%d, nnzIdx: %d\n", s,sRow,nrows,nnzIdx  );
-
-
-            if (meanNnzPerRow + parameter2Adjust*sd < basicSize) {
-            	// these mean use use spmv0
-                grid.x = ( (nrows + block.x -1) /block.x );
-                //printf("using scalar spmv, blockSize: [%d, %d] %f, %f\n",block.x,block.y, meanNnzPerRow, sd) ;
-            } else {
-                // these mean use use spmv1
-                if (meanNnzPerRow >= 2*basicSize) {
-                    block.x = 2*basicSize;
-                } // end if //
-                block.y=128/block.x;
-                grid.x = ( (nrows + block.y - 1) / block.y ) ;
-                //printf("using vector spmv, blockSize: [%d, %d] %f, %f\n",block.x,block.y, meanNnzPerRow, sd) ;
-            	sharedMemorySize=block.x*block.y*sizeof(real);
-            } // end if // 
-
+            const int sRow = starRow[s];
+            const int nrows = starRow[s+1]-starRow[s];
         
             cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
             cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));
             
-            spmv<<<grid, block, sharedMemorySize, stream[s] >>>((w_d+sRow), (rows_d+sRow), (cols_d), nrows);
+            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), (rows_d+sRow), (cols_d), nrows);
             //spmv<<<grid, block, sharedMemorySize, stream[s] >>>((w_d+sRow),  v_d,  (vals_d), (rows_d+sRow), (cols_d), nrows);
             
             cuda_ret = cudaUnbindTexture(xTex);
             cuda_ret = cudaUnbindTexture(valTex);
+
         } // end for //
         
         
         for (int s=0; s<nStreams; ++s) {
-            //cudaDeviceSynchronize();
             //cudaStreamSynchronize(NULL);
             cudaStreamSynchronize(stream[s]);
         } // end for //
@@ -262,9 +266,9 @@ int main(int argc, char *argv[])
    
     if (checkSol=='t') {
         real *sol=NULL;
-        sol     = (real *) malloc((n)*sizeof(real)); 
+        sol     = (real *) malloc((n_global)*sizeof(real)); 
         // reading input vector
-        vectorReader(sol, &n, argv[3]);
+        vectorReader(sol, &n_global, argv[3]);
         
         int row=0;
         const real tolerance=1.0e-08;
@@ -273,25 +277,19 @@ int main(int argc, char *argv[])
             error =  fabs(sol[row] - w[row]) /fabs(sol[row]);
             if ( error > tolerance ) break;
             ++row;
-        } while (row < n); // end do-while //
+        } while (row < n_global); // end do-while //
         
-        if (row == n) {
-            printf("Solution match in rank %d\n",worldRank);
+        if (row == n_global) {
+            printf("Solution match in GPU\n");
         } else {    
-            printf("For Matrix %s, solution does not match at element %d in rank %d   %20.13e   -->  %20.13e  error -> %20.13e, tolerance: %20.13e \n", 
-            argv[1], (row+1),worldRank, sol[row], w[row], error , tolerance  );
+            printf("For Matrix %s, solution does not match at element %d in GPU  %20.13e   -->  %20.13e  error -> %20.13e, tolerance: %20.13e \n", 
+            argv[1], (row+1), sol[row], w[row], error , tolerance  );
         } // end if //
         free(sol);    
     } // end if //
-
     free(w);
     free(v);
-
-    free(row_ptr);
-    free(col_idx);
-    free(val);
     
     #include "parallelSpmvCleanData.h" 
-    //MPI_Finalize();
     return 0;    
 } // end main() //
