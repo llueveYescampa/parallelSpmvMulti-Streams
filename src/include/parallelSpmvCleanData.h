@@ -8,7 +8,6 @@
         cudaStreamDestroy(stream[s]);
     } // end for /
     
-exit(0);
     free(stream);
     
     free(meanNnzPerRow);
