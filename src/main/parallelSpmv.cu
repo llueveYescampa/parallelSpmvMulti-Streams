@@ -43,7 +43,6 @@ void meanAndSd(real *mean, real *sd,real *data, int n)
 
 int main(int argc, char *argv[]) 
 {
- 
     #include "parallelSpmvData.h"
 
     // verifing number of input parameters //
@@ -138,8 +137,7 @@ int main(int argc, char *argv[])
     cuda_ret = cudaMalloc((void **) &w_d,  (n_global)*sizeof(real));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for y_d");
 
-
-    // Copy the input matrices from the host memory to the device memory
+   // Copy the input matrices from the host memory to the device memory
 
     cuda_ret = cudaMemcpy(rows_d, row_ptr, (n_global+1)*sizeof(int),cudaMemcpyHostToDevice);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix rows_d");
@@ -157,7 +155,6 @@ int main(int argc, char *argv[])
 
     const int basicSize = 32;
     const real parameter2Adjust = 0.5;
-    
 
     meanNnzPerRow = (real*) malloc(nStreams*sizeof(real));
     sd            = (real*) malloc(nStreams*sizeof(real ));
@@ -194,7 +191,6 @@ int main(int argc, char *argv[])
         //cuda_ret = cudaStreamCreateWithFlags(&stream0[gpu], cudaStreamDefault);
         cuda_ret = cudaStreamCreateWithFlags(&stream[s], cudaStreamNonBlocking ) ;
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
-
         
         printf("In Stream: %d\n",s);
         if (meanNnzPerRow[s] + parameter2Adjust*sd[s] < basicSize) {
@@ -213,10 +209,6 @@ int main(int argc, char *argv[])
         } // end if // 
 
     } // end for //
-    
-    
-    //printf("%d, %d, %d \n", grid.x, block.x, block.y); exit(0);
-
 
     // Timing should begin here//
     struct timeval tp;                                   // timer
