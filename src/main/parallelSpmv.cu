@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
         exit(0);
     } // end if //
     
-    printf("Solving using %d streams\n", nStreams);
+    printf("Solving using %d %s\n", nStreams, (nStreams > 1) ? "streams": "stream"  );
 
     stream= (cudaStream_t *) malloc(sizeof(cudaStream_t) * nStreams);
     
