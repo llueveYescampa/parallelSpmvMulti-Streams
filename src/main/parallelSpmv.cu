@@ -196,10 +196,7 @@ int main(int argc, char *argv[])
             grid[s].x = (   (  nrows + block[s].x -1) /block[s].x );
             printf("using scalar spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
         } else {
-            // these mean use vector spmv
-            if (meanNnzPerRow[s] >= 2*basicSize) {
-                block[s].x = 2*basicSize;
-            } // end if //
+            // these mean use vector spmv 
             block[s].y=MAXTHREADS/block[s].x;
             grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
         	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
