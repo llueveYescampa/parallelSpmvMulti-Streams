@@ -153,8 +153,6 @@ int main(int argc, char *argv[])
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix x_d");
 
 
-    const int basicSize = 32;
-    const real parameter2Adjust = 0.5;
 
     meanNnzPerRow = (real*) malloc(nStreams*sizeof(real));
     sd            = (real*) malloc(nStreams*sizeof(real ));

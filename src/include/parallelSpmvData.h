@@ -2,6 +2,9 @@
     int nStreams=1;
     int *starRow = NULL;
 
+    const int basicSize = 32;
+    const real parameter2Adjust = 0.5;
+
     // data for the on_proc solution
     int *row_ptr=NULL;
     int *col_idx=NULL;
