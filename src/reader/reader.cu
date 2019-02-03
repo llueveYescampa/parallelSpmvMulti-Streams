@@ -38,11 +38,21 @@ void reader( int *n_global,
 
     (*val)    = (real *) malloc( (*nnz_global) * sizeof(real)); 
     // reading val vector (nnz) values //
-    if ( !fread(*val, sizeof(real), (size_t) (*nnz_global), filePtr)) exit(0);
+    
+    if (sizeof(real) == sizeof(double)) {
+        if ( !fread(*val, sizeof(real), (size_t) (*nnz_global), filePtr)) exit(0);
+    } else {
+        double *temp = (double *) malloc(*nnz_global*sizeof(double)); 
+        if ( !fread(temp, sizeof(double), (size_t) (*nnz_global), filePtr)) exit(0);
+        for (int i=0; i<*nnz_global; i++) {
+            (*val)[i] = (float) temp[i];
+        } // end for //    
+        free(temp);
+    } // end if //
     
     for(int s=0; s<nStreams; ++s) {
         rowsPP[s+1] += rowsPP[s];
-    }
+    } // end for //
     
     fclose(filePtr);
 } // end of reader //

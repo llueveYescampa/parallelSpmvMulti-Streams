@@ -7,4 +7,6 @@ Build*
 matrices
 
 
-/buildCuda/
+
+/buildDoubleP/
+/buildSingleP/
