@@ -169,9 +169,6 @@ int main(int argc, char *argv[])
         grid[s].z = 1;
     } // end for //
 
-
-
-
     for (int s=0; s<nStreams; ++s) {
         int nrows = starRow[s+1]-starRow[s];
         /////////////////////////////////////////////////////
@@ -223,21 +220,16 @@ int main(int argc, char *argv[])
         
             cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
             cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));
-            
             spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), (rows_d+sRow), (cols_d), nrows);
-            //spmv<<<grid, block, sharedMemorySize, stream[s] >>>((w_d+sRow),  v_d,  (vals_d), (rows_d+sRow), (cols_d), nrows);
-            
             cuda_ret = cudaUnbindTexture(xTex);
             cuda_ret = cudaUnbindTexture(valTex);
 
         } // end for //
         
-        
         for (int s=0; s<nStreams; ++s) {
             //cudaStreamSynchronize(NULL);
             cudaStreamSynchronize(stream[s]);
         } // end for //
-        
         
     } // end for //
     
@@ -260,7 +252,7 @@ int main(int argc, char *argv[])
         int row=0;
         real tolerance = 1.0e-08;
         if (sizeof(real) != sizeof(double) ) {
-            tolerance = 1.0e-03;
+            tolerance = 1.0e-02;
         } // end if //
 
         real error;

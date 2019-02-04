@@ -1,7 +1,6 @@
 #include <math.h>
 
-//void getRowsNnzPerProc(int *rowsPerGpu, int *nnzPGPU, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nStreams)
-void getRowsNnzPerProc(int *rowsPerGpu, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nStreams)
+void getRowsNnzPerStream(int *rowsPerSstream, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nStreams)
 {
     float nnzIncre = (float ) *global_nnz/ (float) nStreams;
     float lookingFor=nnzIncre;
@@ -17,7 +16,7 @@ void getRowsNnzPerProc(int *rowsPerGpu, const int *global_n, const int *global_n
                 endRow = row-1;
             } // end if //
             
-            rowsPerGpu[partition] = endRow-startRow+1;
+            rowsPerSstream[partition] = endRow-startRow+1;
             //nnzPGPU[partition]  = row_Ptr[endRow+1] - row_Ptr[startRow];
              
             startRow = endRow+1;

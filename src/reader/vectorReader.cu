@@ -4,13 +4,12 @@
 #include "real.h"
 void vectorReader( real *v, const int *n, const char *vectorFile)
 {
-    const size_t offset = 0;
 
     // opening vector file to read values
     FILE *filePtr;
     filePtr = fopen(vectorFile, "rb");
     // reading cols vector (n) values //
-    fseek(filePtr, offset, SEEK_SET);
+    fseek(filePtr, 0L, SEEK_SET);
 
     if (sizeof(real) == sizeof(double)) {
         if ( !fread(v, sizeof(real), (size_t) *n, filePtr)) exit(0);
@@ -26,6 +25,3 @@ void vectorReader( real *v, const int *n, const char *vectorFile)
     fclose(filePtr);
     // end of opening vector file to read values
 } // end of vectoReader //
-
-
-
