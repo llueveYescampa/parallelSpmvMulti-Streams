@@ -79,6 +79,7 @@ int main(int argc, char *argv[])
 
     if (argc  > 4 ) {
         nStreams = atoi(argv[4]);
+        if (nStreams < 1) nStreams = 1;
     } // end if //
     
     if (fh) fclose(fh);
@@ -190,9 +191,9 @@ int main(int argc, char *argv[])
         printf("In Stream: %d\n",s);
         if (meanNnzPerRow[s] + parameter2Adjust*sd[s] < basicSize) {
         	// these mean use scalar spmv
-            if (meanNnzPerRow[s] < 4) {
+            if (meanNnzPerRow[s] < (real) 4.0) {
                 block[s].x=128;
-            } else if (meanNnzPerRow[s] < 16) {
+            } else if (meanNnzPerRow[s] < (real) 14.5) {
                 block[s].x=64;
             } else {
                 block[s].x=32;
@@ -201,7 +202,11 @@ int main(int argc, char *argv[])
             printf("using scalar spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
         } else {
             // these mean use vector spmv 
-            block[s].x=basicSize;
+            if (meanNnzPerRow[s] > 8.0*basicSize) {
+                block[s].x=2*basicSize;
+            }  else {
+                block[s].x=basicSize;
+            } // end if //
             block[s].y=MAXTHREADS/block[s].x;
             grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
         	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
