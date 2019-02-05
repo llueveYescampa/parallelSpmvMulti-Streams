@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
     sharedMemorySize = (size_t *) calloc(nStreams, sizeof(size_t)); 
 
     for (int s=0; s<nStreams; ++s) {
-        block[s].x = basicSize;
+        block[s].x = 1;
         block[s].y = 1;
         block[s].z = 1;
         grid[s].x = 1;
@@ -190,10 +190,18 @@ int main(int argc, char *argv[])
         printf("In Stream: %d\n",s);
         if (meanNnzPerRow[s] + parameter2Adjust*sd[s] < basicSize) {
         	// these mean use scalar spmv
+            if (meanNnzPerRow[s] < 4) {
+                block[s].x=128;
+            } else if (meanNnzPerRow[s] < 16) {
+                block[s].x=64;
+            } else {
+                block[s].x=32;
+            } // end if //
             grid[s].x = (   (  nrows + block[s].x -1) /block[s].x );
             printf("using scalar spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
         } else {
             // these mean use vector spmv 
+            block[s].x=basicSize;
             block[s].y=MAXTHREADS/block[s].x;
             grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
         	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);

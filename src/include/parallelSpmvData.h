@@ -3,7 +3,7 @@
     int *starRow = NULL;
 
     const int basicSize = 32;
-    const real parameter2Adjust = 0.5;
+    const real parameter2Adjust = 0.05;
 
     // data for the on_proc solution
     int *row_ptr=NULL;
