@@ -38,7 +38,7 @@ void meanAndSd(real *mean, real *sd,real *data, int n)
         standardDeviation += pow(data[i] - *mean, 2);
     } // end for //
     *sd=sqrt(standardDeviation/n);
-} // end of calculateSD //
+} // end of meanAndSd //
 
 
 int main(int argc, char *argv[]) 
@@ -77,17 +77,35 @@ int main(int argc, char *argv[])
         } // end if //
     } // end if //
 
-    if (argc  > 4 ) {
-        nStreams = atoi(argv[4]);
-        if (nStreams < 1) nStreams = 1;
-    } // end if //
-    
-    if (fh) fclose(fh);
-    
     if (exists == 'f') {
         printf("Quitting.....\n");
         exit(0);
     } // end if //
+
+
+    if (argc  > 4  && atoi(argv[4]) > 0) {
+        nStreams = atoi(argv[4]);
+    } else {    
+        // opening matrix file to read mean and sd of number of nonzeros per row
+        double tmpMean, tmpSD;
+        fh = fopen(argv[1], "rb");
+        // reading laast two values in file: mean and sd //
+        fseek(fh, 0L, SEEK_END);
+        long int offset = ftell(fh)-2*sizeof(double);
+        fseek(fh, offset, SEEK_SET);
+        if ( !fread(&tmpMean, sizeof(double), (size_t) 1, fh)) exit(0);
+        if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
+        // determining number of streams based on mean and sd
+        int streams = 0.1*tmpSD/tmpMean;
+        if (streams > nStreams && streams < MAX_STREAMS) {
+            nStreams = streams;
+        } else if (streams > MAX_STREAMS) {
+            nStreams = MAX_STREAMS;
+        } // end if //
+    } // end if //
+
+    if (fh) fclose(fh);
+    
     
     printf("%s Precision. Solving using %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nStreams, (nStreams > 1) ? "streams": "stream"  );
 
@@ -191,9 +209,9 @@ int main(int argc, char *argv[])
         printf("In Stream: %d\n",s);
         if (meanNnzPerRow[s] + parameter2Adjust*sd[s] < basicSize) {
         	// these mean use scalar spmv
-            if (meanNnzPerRow[s] < (real) 4.0) {
+            if (meanNnzPerRow[s] < (real) 4.5) {
                 block[s].x=128;
-            } else if (meanNnzPerRow[s] < (real) 14.5) {
+            } else if (meanNnzPerRow[s] < (real) 14.4) {
                 block[s].x=64;
             } else {
                 block[s].x=32;
@@ -202,7 +220,7 @@ int main(int argc, char *argv[])
             printf("using scalar spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
         } else {
             // these mean use vector spmv 
-            if (meanNnzPerRow[s] > 8.0*basicSize) {
+            if (meanNnzPerRow[s] > 10.0*basicSize) {
                 block[s].x=2*basicSize;
             }  else {
                 block[s].x=basicSize;
