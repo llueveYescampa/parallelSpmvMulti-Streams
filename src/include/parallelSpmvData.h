@@ -6,7 +6,7 @@
     int *starRow = NULL;
 
     const int warpSize = 32;
-    const real parameter2Adjust = 0.1;
+    const real parameter2Adjust = 0.15;
 
     // data for the on_proc solution
     int *row_ptr=NULL;
