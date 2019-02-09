@@ -12,7 +12,14 @@
     int *row_ptr=NULL;
     int *col_idx=NULL;
     real *val=NULL;
+
+    int *rows_d, *cols_d;
+    real *vals_d;
+    real *v_d, *w_d;
+
     // end of data for the on_proc solution
+    
+    
     
     cudaStream_t *stream = NULL;
     

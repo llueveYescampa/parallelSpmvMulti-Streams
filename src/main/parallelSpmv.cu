@@ -134,11 +134,6 @@ int main(int argc, char *argv[])
 //////////////////////////////////////
 // cuda stuff start here
 
-
-    int *rows_d, *cols_d;
-    real *vals_d;
-    real *v_d, *w_d;
-
     // Allocating device memory for input matrices 
 
     cuda_ret = cudaMalloc((void **) &rows_d,  (n_global+1)*sizeof(int));
