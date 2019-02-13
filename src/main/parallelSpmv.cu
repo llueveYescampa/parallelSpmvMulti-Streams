@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
         
         printf("In Stream: %d\n",s);
-        if (meanNnzPerRow[s] < warpSize/4 && parameter2Adjust*sd[s] < warpSize) {
+        if (meanNnzPerRow[s] < 10 && parameter2Adjust*sd[s] < warpSize) {
         	// these mean use scalar spmv
             if (meanNnzPerRow[s] < (real) 4.5) {
                 block[s].x=128;
