@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
         
         printf("In Stream: %d\n",s);
-        if (meanNnzPerRow[s] < warpSize && parameter2Adjust*sd[s] < warpSize) {
+        if (meanNnzPerRow[s] < warpSize/4 && parameter2Adjust*sd[s] < warpSize) {
         	// these mean use scalar spmv
             if (meanNnzPerRow[s] < (real) 4.5) {
                 block[s].x=128;
@@ -217,8 +217,10 @@ int main(int argc, char *argv[])
             // these mean use vector spmv 
             if (meanNnzPerRow[s] > 10.0*warpSize) {
                 block[s].x=2*warpSize;
+            }  else if (meanNnzPerRow[s] > 4.0*warpSize) {
+                block[s].x=warpSize/2;
             }  else {
-                block[s].x=warpSize;
+                block[s].x=warpSize/4;
             } // end if //
             block[s].y=MAXTHREADS/block[s].x;
             grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;

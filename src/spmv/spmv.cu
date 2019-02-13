@@ -48,8 +48,8 @@ void spmv(real *__restrict__ y,
         } // end if //
         return ;
     } // end if //
-        
-    if (blockDim.x==32) { 
+
+    if (blockDim.x==8) { 
         row = blockIdx.x*blockDim.y + threadIdx.y;
         const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
         temp[sharedMemIndx] = (real) 0.0;
@@ -61,9 +61,37 @@ void spmv(real *__restrict__ y,
             } // end for //
           
             // unrolling warp 
-            if (threadIdx.x < 16) {
+            if (threadIdx.x < 4) {
                 volatile real *temp1 = temp;
-                temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
+                //temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
+                //temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
+                temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
+                temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
+                temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
+            } // end if //
+
+            if ((sharedMemIndx % blockDim.x)  == 0) {
+                y[row] += temp[sharedMemIndx];
+            } // end if //   
+        } // end if
+        return;
+    } // end if //
+
+    if (blockDim.x==16) { 
+        row = blockIdx.x*blockDim.y + threadIdx.y;
+        const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
+        temp[sharedMemIndx] = (real) 0.0;
+        
+        if (row < nRows) {
+            for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
+                //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+                temp[ sharedMemIndx] += (fetch_real(valTex,col) * fetch_real( xTex, col_idx[col]));
+            } // end for //
+          
+            // unrolling warp 
+            if (threadIdx.x < 8) {
+                volatile real *temp1 = temp;
+                //temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
                 temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
                 temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
                 temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
