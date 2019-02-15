@@ -2,13 +2,13 @@
 
 void getRowsNnzPerStream(int *rowsPerSstream, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nStreams)
 {
-    float nnzIncre = (float ) *global_nnz/ (float) nStreams;
-    float lookingFor=nnzIncre;
+    double nnzIncre = (double) *global_nnz/ (double) nStreams;
+    double lookingFor=nnzIncre;
     int startRow=0, endRow;
     int partition=0;
 
     for (int row=0; row<*global_n; ++row) {    
-        if ( (float) row_Ptr[row+1] >=  lookingFor ) { 
+        if ( (double) row_Ptr[row+1] >=  lookingFor ) { 
             // search for smallest difference
             if (fabs ( lookingFor - row_Ptr[row+1])  <= fabs ( lookingFor - row_Ptr[row])   ) {
                 endRow = row;
