@@ -30,7 +30,9 @@ void spmv(real *__restrict__ y,
            //real *__restrict__ val, 
            int  *__restrict__ row_ptr, 
            int  *__restrict__ col_idx, 
-           const int nRows
+           const int nRows,
+           const real alpha,
+           const real beta
           )
 {   
     extern __shared__ real temp[];
@@ -44,7 +46,7 @@ void spmv(real *__restrict__ y,
                 //dot += (val[col] * x[col_idx[col]]);
                 dot += (fetch_real(valTex,col) * fetch_real( xTex, col_idx[col])); 
             } // end for //
-            y[row] += dot;
+            y[row] = beta * y[row] + alpha*dot;
         } // end if //
         return ;
     } // end if //
@@ -71,7 +73,7 @@ void spmv(real *__restrict__ y,
             } // end if //
 
             if ((sharedMemIndx % blockDim.x)  == 0) {
-                y[row] += temp[sharedMemIndx];
+                y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
             } // end if //   
         } // end if
         return;
@@ -99,7 +101,8 @@ void spmv(real *__restrict__ y,
             } // end if //
 
             if ((sharedMemIndx % blockDim.x)  == 0) {
-                y[row] += temp[sharedMemIndx];
+                //y[row] += temp[sharedMemIndx];
+                y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
             } // end if //   
         } // end if
         return;
@@ -133,7 +136,8 @@ void spmv(real *__restrict__ y,
             } // end if //
 
             if ((sharedMemIndx % blockDim.x)  == 0) {
-                y[row] += temp[sharedMemIndx];
+                //y[row] += temp[sharedMemIndx];
+                y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
             } // end if //   
         } // end if
         return;

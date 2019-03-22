@@ -11,6 +11,8 @@ void spmv(real *__restrict__ y,
           //real *__restrict__ val,  
           int  *__restrict__ row_ptr, 
           int  *__restrict__ col_idx, 
-          const int nRows
+          const int nRows,
+          const real alpha,
+          const real beta
           );
 
