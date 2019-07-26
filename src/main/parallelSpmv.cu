@@ -238,8 +238,8 @@ int main(int argc, char *argv[])
     elapsed_time = -(tp.tv_sec*1.0e6 + tp.tv_usec);
     for (int t=0; t<REP; ++t) {
 
-        cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(real) );
-        if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
+        //cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(real) );
+        //if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
         
         
         for (int s=0; s<nStreams; ++s) {
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
         
             cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
             cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));
-            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), (rows_d+sRow), (cols_d), nrows, 1.0,1.0);
+            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
             cuda_ret = cudaUnbindTexture(xTex);
             cuda_ret = cudaUnbindTexture(valTex);
 
