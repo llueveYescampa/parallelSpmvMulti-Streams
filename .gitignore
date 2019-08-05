@@ -1,12 +1,1 @@
-# build directories #
-###################
-Build*
-.cproject
-.project
-.settings/
-matrices
-
-
-
-/buildDoubleP/
-/buildSingleP/
+/buildDouble/
