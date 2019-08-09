@@ -3,7 +3,6 @@
 #include <math.h>
 #include <sys/time.h>
 #include "real.h"
-
 #include "parallelSpmv.h"
 
 #define FATAL(msg) \
@@ -17,10 +16,10 @@
 
 #ifdef DOUBLE
     texture<int2>  xTex;
-    texture<int2>  valTex;
+    //texture<int2>  valTex;
 #else
     texture<float> xTex;
-    texture<float> valTex;
+    //texture<float> valTex;
 #endif
 
 void meanAndSd(real *mean, real *sd,real *data, int n)
@@ -202,6 +201,8 @@ int main(int argc, char *argv[])
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
         
         printf("In Stream: %d\n",s);
+        
+/*        
         if (meanNnzPerRow[s] < 10 && parameter2Adjust*sd[s] < warpSize) {
         	// these mean use scalar spmv
             if (meanNnzPerRow[s] < (real) 4.5) {
@@ -227,13 +228,41 @@ int main(int argc, char *argv[])
         	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
             printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
         } // end if // 
+*/        
+
+        // these mean use vector spmv 
+        real limit=meanNnzPerRow[s] + parameter2Adjust*sd[s];
+        if ( limit < 4.5  ) {
+            block[s].x=warpSize/32;
+        }  else if (limit < 6.95 ) {
+            block[s].x=warpSize/16;
+        }  else if (limit < 15.5 ) {
+            block[s].x=warpSize/8;
+        }  else if (limit < 80.0 ) {
+            block[s].x=warpSize/4;
+        }  else if (limit < 300.0 ) {
+            block[s].x=warpSize/2;
+        }  else if (limit < 350.0 ) {
+            block[s].x=warpSize;
+        }  else if (limit < 1000.0 ) {
+            block[s].x=warpSize*2;
+        }  else {
+            block[s].x=warpSize*4;
+        } // end if //
+        
+        block[s].y=MAXTHREADS/block[s].x;
+        grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
+    	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
+        printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
 
     } // end for //
 
     // Timing should begin here//
+    cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
+    //cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));            
+
     struct timeval tp;                                   // timer
     double elapsed_time;
-    
     gettimeofday(&tp,NULL);  // Unix timer
     elapsed_time = -(tp.tv_sec*1.0e6 + tp.tv_usec);
     for (int t=0; t<REP; ++t) {
@@ -241,17 +270,10 @@ int main(int argc, char *argv[])
         //cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(real) );
         //if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
         
-        
         for (int s=0; s<nStreams; ++s) {
             const int sRow = starRow[s];
             const int nrows = starRow[s+1]-starRow[s];
-        
-            cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
-            cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));
-            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
-            cuda_ret = cudaUnbindTexture(xTex);
-            cuda_ret = cudaUnbindTexture(valTex);
-
+            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
         } // end for //
         
         for (int s=0; s<nStreams; ++s) {
@@ -259,11 +281,12 @@ int main(int argc, char *argv[])
             cudaStreamSynchronize(stream[s]);
         } // end for //
         
-    } // end for //
-    
+    } // end for //    
     gettimeofday(&tp,NULL);
     elapsed_time += (tp.tv_sec*1.0e6 + tp.tv_usec);
     printf ("Total time was %f seconds, GFLOPS: %f\n", elapsed_time*1.0e-6, (2.0*nnz_global+ 3.0*n_global)*REP*1.0e-3/elapsed_time);
+    cuda_ret = cudaUnbindTexture(xTex);
+    //cuda_ret = cudaUnbindTexture(valTex);
 
     cuda_ret = cudaMemcpy(w, w_d, (n_global)*sizeof(real),cudaMemcpyDeviceToHost);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix y_d back to host");
