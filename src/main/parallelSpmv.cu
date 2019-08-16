@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
             block[s].x=warpSize/16;
         }  else if (limit < 15.5 ) {
             block[s].x=warpSize/8;
-        }  else if (limit < 80.0 ) {
+        }  else if (limit < 74.0 ) {
             block[s].x=warpSize/4;
         }  else if (limit < 300.0 ) {
             block[s].x=warpSize/2;
