@@ -55,9 +55,9 @@ void spmv(real *__restrict__ y,
     row = blockIdx.x*blockDim.y + threadIdx.y;
     const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
     temp[sharedMemIndx] = (real) 0.0;
-    volatile real *temp1 = temp;
 
     if (row < nRows) {
+        volatile real *temp1 = temp;
         switch((blockDim.x)) {
             case 1  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
@@ -186,7 +186,7 @@ void spmv(real *__restrict__ y,
                 
                 // unrolling warp 
                 if (threadIdx.x < 32) {
-                    temp[sharedMemIndx]  += temp[sharedMemIndx  + 32];
+                    temp1[sharedMemIndx] += temp1[sharedMemIndx  + 32];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
