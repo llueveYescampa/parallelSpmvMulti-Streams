@@ -11,8 +11,7 @@
         exit(-1);\
     } while(0)
 
-#define MAXTHREADS 128
-#define REP 1000
+#define REP 1
 
 #ifdef DOUBLE
     texture<int2>  xTex;
@@ -81,29 +80,8 @@ int main(int argc, char *argv[])
         exit(0);
     } // end if //
 
+    nStreams = 1;
 
-    if (argc  > 4  && atoi(argv[4]) > 0) {
-        nStreams = atoi(argv[4]);
-    } else {    
-        // opening matrix file to read mean and sd of number of nonzeros per row
-        double tmpMean, tmpSD;
-        fh = fopen(argv[1], "rb");
-        // reading laast two values in file: mean and sd //
-        fseek(fh, 0L, SEEK_END);
-        long int offset = ftell(fh)-2*sizeof(double);
-        fseek(fh, offset, SEEK_SET);
-        if ( !fread(&tmpMean, sizeof(double), (size_t) 1, fh)) exit(0);
-        if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
-        // determining number of streams based on mean and sd
-        int streams = 0.1*tmpSD/tmpMean;
-        if (streams > nStreams && streams < MAX_STREAMS) {
-            nStreams = streams;
-        } else if (streams > MAX_STREAMS) {
-            nStreams = MAX_STREAMS;
-        } // end if //
-    } // end if //
-
-    if (fh) fclose(fh);
     
     
     printf("%s Precision. Solving using %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nStreams, (nStreams > 1) ? "streams": "stream"  );
@@ -115,7 +93,6 @@ int main(int argc, char *argv[])
     reader(&n_global,&nnz_global, starRow, 
            &row_ptr,&col_idx,&val,
            argv[1], nStreams);
-    
     
     // ready to start //    
     cudaError_t cuda_ret;
@@ -143,6 +120,9 @@ int main(int argc, char *argv[])
     
     cuda_ret = cudaMalloc((void **) &vals_d,  (nnz_global)*sizeof(real));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for vals_d");
+
+    cuda_ret = cudaMalloc((void **) &temp,  (nnz_global)*sizeof(real));
+    if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for temp array");
 
     cuda_ret = cudaMalloc((void **) &v_d,  (n_global)*sizeof(real));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for x_d");
@@ -202,56 +182,10 @@ int main(int argc, char *argv[])
         
         printf("In Stream: %d\n",s);
         
-/*        
-        if (meanNnzPerRow[s] < 10 && parameter2Adjust*sd[s] < warpSize) {
-        	// these mean use scalar spmv
-            if (meanNnzPerRow[s] < (real) 4.5) {
-                block[s].x=128;
-            } else if (meanNnzPerRow[s] < (real) 14.4) {
-                block[s].x=64;
-            } else {
-                block[s].x=32;
-            } // end if //
-            grid[s].x = (   (  nrows + block[s].x -1) /block[s].x );
-            printf("using scalar spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
-        } else {
-            // these mean use vector spmv 
-            if (meanNnzPerRow[s] > 10.0*warpSize) {
-                block[s].x=2*warpSize;
-            }  else if (meanNnzPerRow[s] > 4.0*warpSize) {
-                block[s].x=warpSize/2;
-            }  else {
-                block[s].x=warpSize/4;
-            } // end if //
-            block[s].y=MAXTHREADS/block[s].x;
-            grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
-        	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
-            printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
-        } // end if // 
-*/        
 
-        // these mean use vector spmv 
-        real limit=meanNnzPerRow[s] + parameter2Adjust*sd[s];
-        if ( limit < 4.5  ) {
-            block[s].x=warpSize/32;
-        }  else if (limit < 6.95 ) {
-            block[s].x=warpSize/16;
-        }  else if (limit < 15.5 ) {
-            block[s].x=warpSize/8;
-        }  else if (limit < 74.0 ) {
-            block[s].x=warpSize/4;
-        }  else if (limit < 300.0 ) {
-            block[s].x=warpSize/2;
-        }  else if (limit < 350.0 ) {
-            block[s].x=warpSize;
-        }  else if (limit < 1000.0 ) {
-            block[s].x=warpSize*2;
-        }  else {
-            block[s].x=warpSize*4;
-        } // end if //
-        
+        block[s].x=MAXTHREADS;
         block[s].y=MAXTHREADS/block[s].x;
-        grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
+        grid[s].x = ( (nrows + block[s].x - 1) / block[s].x ) ;
     	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
         printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
 
@@ -270,16 +204,11 @@ int main(int argc, char *argv[])
         //cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(real) );
         //if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
         
-        for (int s=0; s<nStreams; ++s) {
-            const int sRow = starRow[s];
-            const int nrows = starRow[s+1]-starRow[s];
-            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
-        } // end for //
         
-        for (int s=0; s<nStreams; ++s) {
-            //cudaStreamSynchronize(NULL);
-            cudaStreamSynchronize(stream[s]);
-        } // end for //
+        alg1<<<grid[0], block[0] >>>(temp,vals_d,cols_d,nnz_global);
+        alg2<<<grid[0], block[0] >>>(w_d , temp,  rows_d, n_global, 1.0, 0.0 );
+        cudaStreamSynchronize(NULL);
+        
         
     } // end for //    
     gettimeofday(&tp,NULL);

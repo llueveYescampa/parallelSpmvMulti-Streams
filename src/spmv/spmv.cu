@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "real.h"
+#include "parallelSpmv.h"
 
 #ifdef DOUBLE
     extern texture<int2> xTex;
@@ -24,181 +25,105 @@
     } // end of fetch_double() //
 #endif
 
+
 __global__ 
-void spmv(real *__restrict__ y, 
-           //real *__restrict__ x, 
-           real *__restrict__ val, 
-           int  *__restrict__ row_ptr, 
-           int  *__restrict__ col_idx, 
-           const int nRows,
-           const real alpha,
-           const real beta
-          )
-{   
-    extern __shared__ real temp[];
-    int row,col;
-/*
-    if (blockDim.y==1) { 
-        row = blockIdx.x*blockDim.x + threadIdx.x;
-        if (row < nRows)  {
-            real dot = (real) 0.0;
-            for (col = row_ptr[row]; col < row_ptr[row+1]; ++col ) {
-                //dot += (val[col] * x[col_idx[col]]);
-                dot += (val[col] * fetch_real( xTex, col_idx[col])); 
-            } // end for //
-            y[row] = beta * y[row] + alpha*dot;
+void alg1   (real *__restrict__ const temp, 
+             const real *__restrict__ const val, 
+             const int  *__restrict__ const col_idx, 
+             const int nnz_global
+            )
+{
+    int tid = blockIdx.x*blockDim.x + threadIdx.x;
+    int icr = blockDim.x*gridDim.x;
+    
+    for (; tid<nnz_global; tid+=icr) {
+        temp[tid] = val[tid] * fetch_real( xTex, col_idx[tid]);
+        //printf("%d %f, %f\n",tid, val[tid], temp[tid] );
+    } // end for //
+} // end of alg1() //
+
+__global__ 
+void alg2   (real *__restrict__ const y, 
+             const real *__restrict__ temp,
+             const int  *__restrict__ const row_Ptr,
+             const int nRows,
+             const real alpha,
+             const real beta
+            )
+{
+
+    __shared__ int limit;
+    __shared__ int row_Ptr_s[MAXTHREADS+1];
+    __shared__ real temp_s[SHARED_SIZE];
+    
+    int tid = threadIdx.x;
+    int row = blockIdx.x*blockDim.x + threadIdx.x;
+    
+    if (row < nRows) {
+        y[row] = beta*y[row];
+        
+        row_Ptr_s[tid] = row_Ptr[row];
+        if (tid == 0) {
+            limit = (nRows-row <  MAXTHREADS) ? nRows-row : MAXTHREADS; 
+            //printf("limit: %d, row: %d, \n", limit, row);
+            row_Ptr_s[limit] = row_Ptr[row+limit];
         } // end if //
-        return ;
-    } // end if //
+        
+        __syncthreads();
+        
+        real sum=0.0;
+        int toLoad=row_Ptr_s[limit]-row_Ptr_s[0] ;
+        for (int i=row_Ptr_s[0]; i < row_Ptr_s[limit]; i+=SHARED_SIZE) {
+        
+            int index = tid + i;
+            
+            __syncthreads();
+
+            for (int j=0;  j <= SHARED_SIZE/limit; ++j) {
+                if (tid + j*limit <  (toLoad < SHARED_SIZE ? toLoad :SHARED_SIZE) ) {
+                    temp_s[tid + j*limit] = temp[index];
+                    index +=limit;
+                } // end if //
+            } // end for //
+            
+            __syncthreads();
+            
+            if (  row_Ptr_s[tid+1] > i  && row_Ptr_s[tid] <= (i+SHARED_SIZE-1) ) {
+                int r_s = (row_Ptr_s[tid] - i > 0) ? row_Ptr_s[tid] - i : 0;
+                int r_e = (row_Ptr_s[tid+1] - i < SHARED_SIZE) ? row_Ptr_s[tid+1] - i : SHARED_SIZE;
+                for (int j=r_s; j < r_e; ++j) {
+                    sum += temp_s[j];
+                } // end for //
+            } // end if //
+            
+            y[row] = alpha * sum;
+            toLoad-=SHARED_SIZE;
+        }  // end for //
+    } // end if //    
+} // end of alg2() //
+
+/*
+        if (tid==0 ) {
+            printf("tid: %d,blockIdx: %d, limit: %d [%d,%d]\n", tid, blockIdx.x, limit, row_Ptr_s[0], row_Ptr_s[limit]);
+        }
+*/        
+
+
+/*
+            if (tid==0 && blockIdx.x==0) {
+                printf("index and toLoad : (%3d, %3d)---->  ", index, toLoad);
+            }
 */
 
-    row = blockIdx.x*blockDim.y + threadIdx.y;
-    const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
-    temp[sharedMemIndx] = (real) 0.0;
 
-    if (row < nRows) {
-        volatile real *temp1 = temp;
-        switch((blockDim.x)) {
-            case 1  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
-                y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                break; 
-            case 2  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
+/*            
+            if (tid==0 && blockIdx.x==0) {
+                for (int j=0;  j < (toLoad < SHARED_SIZE ? toLoad :SHARED_SIZE); ++j) {
+                    printf("%f, ", temp_s[j] );
+                } // end for //            
+                printf("\n");
+            }
+*/
 
-                // unrolling warp 
-                if (threadIdx.x < 1) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
+        //if (blockIdx.x==gridDim.x-1) printf("%d, %d %d \n", tid,  row_Ptr_s[tid], row_Ptr_s[tid+1] );
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                } // end if //   
-                break; 
-            case 4  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
-
-                // unrolling warp 
-                if (threadIdx.x < 2) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                } // end if //   
-                break; 
-            case 8  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
-              
-                // unrolling warp 
-                if (threadIdx.x < 4) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
-                } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                } // end if //   
-                break; 
-            case 16  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
-              
-                // unrolling warp 
-                if (threadIdx.x < 8) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
-                } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                } // end if //   
-                break;
-                
-            case 32  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
-              
-                // unrolling warp 
-                if (threadIdx.x < 16) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
-                } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                } // end if //   
-                break; 
-            case 64  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
-               __syncthreads();
-               
-                // unrolling warp 
-                if (threadIdx.x < 32) {
-                    temp[sharedMemIndx]  += temp[sharedMemIndx  + 32];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                } // end if //   
-                break; 
-            case 128  :
-                for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
-                } // end for //
-               __syncthreads();
-               
-                if (threadIdx.x<64) temp[sharedMemIndx] += temp[sharedMemIndx + 64];
-                __syncthreads();
-                
-                // unrolling warp 
-                if (threadIdx.x < 32) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx  + 32];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
-                } // end if //   
-                break; 
-        } // end switch //
-    } // end if    
-} // end of spmv() //

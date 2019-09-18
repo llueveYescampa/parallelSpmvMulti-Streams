@@ -5,8 +5,6 @@
     int nStreams=DEFAULT_STREAMS;
     int *starRow = NULL;
 
-    const int warpSize = 32;
-    const real parameter2Adjust = 0.15;
 
     // data for the on_proc solution
     int *row_ptr=NULL;
@@ -15,6 +13,7 @@
 
     int *rows_d, *cols_d;
     real *vals_d;
+    real *temp;
     real *v_d, *w_d;
 
     // end of data for the on_proc solution
