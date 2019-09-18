@@ -11,7 +11,7 @@
         exit(-1);\
     } while(0)
 
-#define REP 1
+#define REP 1000
 
 #ifdef DOUBLE
     texture<int2>  xTex;
@@ -21,22 +21,6 @@
     //texture<float> valTex;
 #endif
 
-void meanAndSd(real *mean, real *sd,real *data, int n)
-{
-    real sum = (real) 0.0; 
-    real standardDeviation = (real) 0.0;
-
-    for(int i=0; i<n; ++i) {
-        sum += data[i];
-    } // end for //
-
-    *mean = sum/n;
-
-    for(int i=0; i<n; ++i) {
-        standardDeviation += pow(data[i] - *mean, 2);
-    } // end for //
-    *sd=sqrt(standardDeviation/n);
-} // end of meanAndSd //
 
 
 int main(int argc, char *argv[]) 
@@ -74,25 +58,20 @@ int main(int argc, char *argv[])
             checkSol='t';
         } // end if //
     } // end if //
-
+    fclose(fh);
+    
     if (exists == 'f') {
         printf("Quitting.....\n");
         exit(0);
     } // end if //
-
-    nStreams = 1;
-
     
+    printf("%s Precision. \n", (sizeof(real) == sizeof(double)) ? "Double": "Single" );
     
-    printf("%s Precision. Solving using %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nStreams, (nStreams > 1) ? "streams": "stream"  );
-
-    stream= (cudaStream_t *) malloc(sizeof(cudaStream_t) * nStreams);
-    
-    starRow = (int *) malloc(sizeof(int) * nStreams+1); 
+    starRow = (int *) malloc(2*sizeof(int) ); 
     starRow[0]=0;
     reader(&n_global,&nnz_global, starRow, 
            &row_ptr,&col_idx,&val,
-           argv[1], nStreams);
+           argv[1], 1);
     
     // ready to start //    
     cudaError_t cuda_ret;
@@ -146,50 +125,17 @@ int main(int argc, char *argv[])
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix x_d");
 
 
+    block.x = 1;
+    block.y = 1;
+    block.z = 1;
+    grid.x = 1;
+    grid.y = 1;
+    grid.z = 1;
 
-    meanNnzPerRow = (real*) malloc(nStreams*sizeof(real));
-    sd            = (real*) malloc(nStreams*sizeof(real ));
-    block = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
-    grid  = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
-    sharedMemorySize = (size_t *) calloc(nStreams, sizeof(size_t)); 
-
-    for (int s=0; s<nStreams; ++s) {
-        block[s].x = 1;
-        block[s].y = 1;
-        block[s].z = 1;
-        grid[s].x = 1;
-        grid[s].y = 1;
-        grid[s].z = 1;
-    } // end for //
-
-    for (int s=0; s<nStreams; ++s) {
-        int nrows = starRow[s+1]-starRow[s];
-        /////////////////////////////////////////////////////
-        // determining the standard deviation of the nnz per row
-        real *temp=(real *) calloc(nrows,sizeof(real));
-        
-        for (int row=starRow[s], i=0; row<starRow[s]+nrows; ++row, ++i) {
-            temp[i] = row_ptr[row+1] - row_ptr[row];
-        } // end for //
-        meanAndSd(&meanNnzPerRow[s],&sd[s],temp, nrows);
-        //printf("file: %s, line: %d, gpu on-prcoc:   %d, mean: %7.3f, sd: %7.3f using: %s\n", __FILE__, __LINE__, s , meanNnzPerRow[s], sd[s], (meanNnzPerRow[s] + 0.5*sd[s] < 32) ? "spmv0": "spmv1" );
-        free(temp);
-        /////////////////////////////////////////////////////
-
-        //cuda_ret = cudaStreamCreateWithFlags(&stream0[gpu], cudaStreamDefault);
-        cuda_ret = cudaStreamCreateWithFlags(&stream[s], cudaStreamNonBlocking ) ;
-        if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
-        
-        printf("In Stream: %d\n",s);
-        
-
-        block[s].x=MAXTHREADS;
-        block[s].y=MAXTHREADS/block[s].x;
-        grid[s].x = ( (nrows + block[s].x - 1) / block[s].x ) ;
-    	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
-        printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
-
-    } // end for //
+    block.x=MAXTHREADS;
+    block.y=MAXTHREADS/block.x;
+    grid.x = ( (n_global + block.x - 1) / block.x ) ;
+    printf("using vector spmv for on matrix,  blockSize: [%d, %d]\n",block.x,block.y  ) ;
 
     // Timing should begin here//
     cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
@@ -201,14 +147,9 @@ int main(int argc, char *argv[])
     elapsed_time = -(tp.tv_sec*1.0e6 + tp.tv_usec);
     for (int t=0; t<REP; ++t) {
 
-        //cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(real) );
-        //if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
-        
-        
-        alg1<<<grid[0], block[0] >>>(temp,vals_d,cols_d,nnz_global);
-        alg2<<<grid[0], block[0] >>>(w_d , temp,  rows_d, n_global, 1.0, 0.0 );
+        alg1<<<grid, block >>>(temp,vals_d,cols_d,nnz_global);
+        alg2<<<grid, block >>>(w_d , temp,  rows_d, n_global, 1.0, 0.0 );
         cudaStreamSynchronize(NULL);
-        
         
     } // end for //    
     gettimeofday(&tp,NULL);

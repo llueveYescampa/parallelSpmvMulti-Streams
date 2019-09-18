@@ -1,4 +1,4 @@
-#include <stdio.h>
+//#include <stdio.h>
 #include "real.h"
 #include "parallelSpmv.h"
 
@@ -44,14 +44,13 @@ void alg1   (real *__restrict__ const temp,
 
 __global__ 
 void alg2   (real *__restrict__ const y, 
-             const real *__restrict__ temp,
+             const real *__restrict__ const temp,
              const int  *__restrict__ const row_Ptr,
              const int nRows,
              const real alpha,
              const real beta
             )
 {
-
     __shared__ int limit;
     __shared__ int row_Ptr_s[MAXTHREADS+1];
     __shared__ real temp_s[SHARED_SIZE];
@@ -65,7 +64,6 @@ void alg2   (real *__restrict__ const y,
         row_Ptr_s[tid] = row_Ptr[row];
         if (tid == 0) {
             limit = (nRows-row <  MAXTHREADS) ? nRows-row : MAXTHREADS; 
-            //printf("limit: %d, row: %d, \n", limit, row);
             row_Ptr_s[limit] = row_Ptr[row+limit];
         } // end if //
         

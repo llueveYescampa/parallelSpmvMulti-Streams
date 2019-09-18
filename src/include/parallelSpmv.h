@@ -21,7 +21,7 @@ void alg1   (real *__restrict__ const temp,
 
 __global__ 
 void alg2   (real *__restrict__ const y, 
-             const real *__restrict__ temp,
+             const real *__restrict__ const temp,
              const int  *__restrict__ const row_Ptr,
              const int nRows,
              const real alpha,

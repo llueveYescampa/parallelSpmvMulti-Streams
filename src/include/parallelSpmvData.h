@@ -1,8 +1,5 @@
-# define DEFAULT_STREAMS 4
-# define MAX_STREAMS 16
 
     int n_global,nnz_global;
-    int nStreams=DEFAULT_STREAMS;
     int *starRow = NULL;
 
 
@@ -18,15 +15,6 @@
 
     // end of data for the on_proc solution
     
-    
-    
-    cudaStream_t *stream = NULL;
-    
-    real *meanNnzPerRow=NULL;
-    real *sd=NULL;
-    
-    dim3 *block=NULL;
-    dim3 *grid=NULL;
-
-    size_t *sharedMemorySize=NULL;
+    dim3 block;
+    dim3 grid;
 
