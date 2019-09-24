@@ -12,7 +12,7 @@ int createColIdxMap(int **b,  int *a, const int *n);
 
 
 __global__ 
-void alg1   (real *__restrict__ const temp, 
+void alg1   (      real *__restrict__ const temp, 
              const real *__restrict__ const val, 
              const int  *__restrict__ const col_idx, 
              const int nnz_global  

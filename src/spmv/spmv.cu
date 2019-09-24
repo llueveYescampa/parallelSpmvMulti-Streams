@@ -27,18 +27,14 @@
 
 
 __global__ 
-void alg1   (real *__restrict__ const temp, 
+void alg1   (      real *__restrict__ const temp, 
              const real *__restrict__ const val, 
              const int  *__restrict__ const col_idx, 
              const int nnz_global
             )
 {
-    int tid = blockIdx.x*blockDim.x + threadIdx.x;
-    int icr = blockDim.x*gridDim.x;
-    
-    for (; tid<nnz_global; tid+=icr) {
+    for (int tid = blockIdx.x*blockDim.x + threadIdx.x; tid<nnz_global; tid+=blockDim.x*gridDim.x) {
         temp[tid] = val[tid] * fetch_real( xTex, col_idx[tid]);
-        //printf("%d %f, %f\n",tid, val[tid], temp[tid] );
     } // end for //
 } // end of alg1() //
 
