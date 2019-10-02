@@ -10,7 +10,7 @@
 
     int *rows_d, *cols_d;
     real *vals_d;
-    real *temp;
+    int *blockRows_d;
     real *v_d, *w_d;
 
     // end of data for the on_proc solution

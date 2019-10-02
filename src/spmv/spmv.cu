@@ -1,4 +1,4 @@
-//#include <stdio.h>
+#include <stdio.h>
 #include "real.h"
 #include "parallelSpmv.h"
 
@@ -24,29 +24,45 @@
 	    return tex1Dfetch(t,i);
     } // end of fetch_double() //
 #endif
-
-
 __global__ 
-void alg1   (      real *__restrict__ const temp, 
+void alg3   (real *__restrict__ const y, 
              const real *__restrict__ const val, 
              const int  *__restrict__ const col_idx, 
-             const int nnz_global
-            )
-{
-    for (int tid = blockIdx.x*blockDim.x + threadIdx.x; tid<nnz_global; tid+=blockDim.x*gridDim.x) {
-        temp[tid] = val[tid] * fetch_real( xTex, col_idx[tid]);
-    } // end for //
-} // end of alg1() //
-
-__global__ 
-void alg2   (real *__restrict__ const y, 
-             const real *__restrict__ const temp,
              const int  *__restrict__ const row_Ptr,
-             const int nRows,
+             const int  *__restrict__ const blockRows_d, 
+             const int sizeBlockRows,
              const real alpha,
              const real beta
             )
 {
+    __shared__ real temp_s[SHARED_SIZE];
+
+    int tid = threadIdx.x;
+    int bid = blockIdx.x;
+
+    int starRow=blockRows_d[bid];
+    int endRow=blockRows_d[bid+1];
+    int firstCol=row_Ptr[starRow];
+    int nnz = row_Ptr[endRow] - row_Ptr[starRow];
+    
+    
+    for (int i=tid; i<nnz; i+=blockDim.x) {
+        temp_s[i] = val[firstCol+i] * fetch_real( xTex, col_idx[firstCol+i]);
+    } // end for //
+    __syncthreads();
+
+    if (tid < (endRow-starRow) ) {
+        real sum = 0;
+        int row_s = row_Ptr[starRow+tid]   - firstCol;
+        int row_e = row_Ptr[starRow+tid+1] - firstCol;
+        
+        for (int i=row_s; i < row_e; ++i) {
+            sum +=temp_s[i];
+        } // end for //
+        y[starRow+tid] =  beta*y[starRow+tid] +  alpha * sum;
+    } // end if //
+
+/*
     __shared__ int limit;
     __shared__ int row_Ptr_s[MAXTHREADS+1];
     __shared__ real temp_s[SHARED_SIZE];
@@ -94,9 +110,16 @@ void alg2   (real *__restrict__ const y,
             toLoad-=SHARED_SIZE;
         }  // end for //
     } // end if //    
-} // end of alg2() //
+*/    
+} // end of alg3() //
 
 /*
+
+    if (tid==0)  printf("bid: %d starRow: %d, endRow: %d, nnz: %d\n", bid, starRow, endRow, nnz);
+
+
+    if (tid==0)  printf("bid: %d starRow: %d, endRow: %d\n", bid, starRow, endRow);
+
         if (tid==0 ) {
             printf("tid: %d,blockIdx: %d, limit: %d [%d,%d]\n", tid, blockIdx.x, limit, row_Ptr_s[0], row_Ptr_s[limit]);
         }

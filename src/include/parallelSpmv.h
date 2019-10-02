@@ -20,10 +20,12 @@ void alg1   (      real *__restrict__ const temp,
 
 
 __global__ 
-void alg2   (real *__restrict__ const y, 
-             const real *__restrict__ const temp,
+void alg3   (real *__restrict__ const y, 
+             const real *__restrict__ const val, 
+             const int  *__restrict__ const col_idx, 
              const int  *__restrict__ const row_Ptr,
-             const int nRows,
+             const int  *__restrict__ const blockRows_d, 
+             const int sizeBlockRows,
              const real alpha,
              const real beta
             );

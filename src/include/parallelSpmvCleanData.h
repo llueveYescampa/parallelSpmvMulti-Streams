@@ -6,7 +6,7 @@
     cudaFree(rows_d);
     cudaFree(cols_d);
     cudaFree(vals_d);
-    cudaFree(temp);
+    cudaFree(blockRows_d);
     cudaFree(v_d);
     cudaFree(w_d);
 

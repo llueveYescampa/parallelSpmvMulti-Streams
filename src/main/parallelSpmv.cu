@@ -87,6 +87,60 @@ int main(int argc, char *argv[])
     // reading input vector
     vectorReader(v, &n_global, argv[2]);
 //////////////////////////////////////
+/* Determining number of rows to be proceced by each block */
+    
+    int *blockRows=(int *) malloc( n_global*sizeof(int));
+    blockRows[0]=0;
+    int sum=0;
+    int lastRow=0;
+    int sizeBlockRows=1;
+    int nRow=0;
+    
+    for (int row=1; row<n_global; ++row) {
+        sum += (row_ptr[row] - row_ptr[row-1]);
+        ++nRow;
+        if ( sum == SHARED_SIZE  ||  nRow == MAXTHREADS  &&  sum < SHARED_SIZE) {
+            lastRow=row;
+            blockRows[sizeBlockRows++] = row;
+            sum=0;
+            nRow=0;
+        } else if (sum > SHARED_SIZE) {
+            if (row-lastRow > 1) {
+                blockRows[sizeBlockRows++] = row-1;
+                --row;
+                nRow=0;
+            } else if (row-lastRow ==  1) {
+                blockRows[sizeBlockRows++] = row;
+                nRow=0;
+            } // end if
+            lastRow=row;
+            sum=0;
+        } // end if //
+    } // end for //
+    blockRows[sizeBlockRows++] = n_global;
+    
+    cuda_ret = cudaMalloc((void **) &blockRows_d,  (sizeBlockRows)*sizeof(int));
+    if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for blockRows_d array");
+
+    cuda_ret = cudaMemcpy(blockRows_d, blockRows, sizeBlockRows*sizeof(int),cudaMemcpyHostToDevice);
+    if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix blockRows_d");
+
+    /*
+    printf("sizeBlockRows: %d\n", sizeBlockRows); 
+    for (int i=0; i<sizeBlockRows; ++i ) {
+        printf("%4d", blockRows[i]);
+    }
+    printf("\n");
+    
+    
+    printf("n_global: %d\n", n_global); 
+    printf("\nMAXTHREADS: %d\n", MAXTHREADS); 
+    printf("SHARED_SIZE: %d\n", SHARED_SIZE); exit(0);
+    */
+    
+    free(blockRows);
+//////////////////////////////////////////
+
 // cuda stuff start here
 
     // Allocating device memory for input matrices 
@@ -99,9 +153,6 @@ int main(int argc, char *argv[])
     
     cuda_ret = cudaMalloc((void **) &vals_d,  (nnz_global)*sizeof(real));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for vals_d");
-
-    cuda_ret = cudaMalloc((void **) &temp,  (nnz_global)*sizeof(real));
-    if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for temp array");
 
     cuda_ret = cudaMalloc((void **) &v_d,  (n_global)*sizeof(real));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for x_d");
@@ -125,16 +176,14 @@ int main(int argc, char *argv[])
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix x_d");
 
 
-    block.x = 1;
+    block.x=MAXTHREADS;
     block.y = 1;
     block.z = 1;
-    grid.x = 1;
+    grid.x = sizeBlockRows-1;
     grid.y = 1;
     grid.z = 1;
 
-    block.x=MAXTHREADS;
     block.y=MAXTHREADS/block.x;
-    grid.x = ( (n_global + block.x - 1) / block.x ) ;
     printf("using vector spmv for on matrix,  blockSize: [%d, %d]\n",block.x,block.y  ) ;
 
     // Timing should begin here//
@@ -147,8 +196,8 @@ int main(int argc, char *argv[])
     elapsed_time = -(tp.tv_sec + tp.tv_usec*1.0e-6);
     for (int t=0; t<REP; ++t) {
 
-        alg1<<<grid, block >>>(temp,vals_d,cols_d,nnz_global);
-        alg2<<<grid, block >>>(w_d , temp,  rows_d, n_global, 1.0, 0.0 );
+        //alg1<<<grid, block >>>(temp,vals_d,cols_d,nnz_global);
+        alg3<<<grid, block >>>(w_d , vals_d,cols_d, rows_d,blockRows_d, sizeBlockRows, 1.0, 0.0 );
         cudaStreamSynchronize(NULL);
         
     } // end for //    
