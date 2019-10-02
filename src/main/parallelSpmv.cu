@@ -102,11 +102,15 @@ int main(int argc, char *argv[])
             nRows=0;
             sum=0;
         } else if (sum > SHARED_SIZE) {
-            blockRows[sizeBlockRows] = row;
+            if (row_ptr[row+1] - row_ptr[row] < SHARED_SIZE) {
+                blockRows[sizeBlockRows] = row;
+                nRows=0;
+                --row;
+            } else {
+                blockRows[sizeBlockRows] = row+1;
+            } // end if //
             ++sizeBlockRows;
-            nRows=0;
             sum=0;
-            --row;
         } // end if //
     } // end for //
 
