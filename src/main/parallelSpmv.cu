@@ -58,12 +58,11 @@ int main(int argc, char *argv[])
             checkSol='t';
         } // end if //
     } // end if //
-    fclose(fh);
-    
     if (exists == 'f') {
         printf("Quitting.....\n");
         exit(0);
     } // end if //
+    fclose(fh);
     
     printf("%s Precision. \n", (sizeof(real) == sizeof(double)) ? "Double": "Single" );
     
@@ -91,41 +90,34 @@ int main(int argc, char *argv[])
     
     int *blockRows=(int *) malloc( n_global*sizeof(int));
     blockRows[0]=0;
-    int sum=0;
-    int lastRow=0;
+    int nRows=0;
     int sizeBlockRows=1;
-    int nRow=0;
-    
-    for (int row=1; row<n_global; ++row) {
-        sum += (row_ptr[row] - row_ptr[row-1]);
-        ++nRow;
-        if ( sum == SHARED_SIZE  ||  nRow == MAXTHREADS  &&  sum < SHARED_SIZE) {
-            lastRow=row;
-            blockRows[sizeBlockRows++] = row;
+    int sum=0;
+    for (int row=0; row<n_global; ++row) {
+        sum += (row_ptr[row+1] - row_ptr[row]);
+        ++nRows;
+        if ( sum == SHARED_SIZE  ||  (nRows == MAXTHREADS  &&  sum < SHARED_SIZE) ) {
+            blockRows[sizeBlockRows] = row+1;
+            ++sizeBlockRows;
+            nRows=0;
             sum=0;
-            nRow=0;
         } else if (sum > SHARED_SIZE) {
-            if (row-lastRow > 1) {
-                blockRows[sizeBlockRows++] = row-1;
-                --row;
-                nRow=0;
-            } else if (row-lastRow ==  1) {
-                blockRows[sizeBlockRows++] = row;
-                nRow=0;
-            } // end if
-            lastRow=row;
+            blockRows[sizeBlockRows] = row;
+            ++sizeBlockRows;
+            nRows=0;
             sum=0;
+            --row;
         } // end if //
     } // end for //
-    blockRows[sizeBlockRows++] = n_global;
-    
-    cuda_ret = cudaMalloc((void **) &blockRows_d,  (sizeBlockRows)*sizeof(int));
-    if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for blockRows_d array");
 
-    cuda_ret = cudaMemcpy(blockRows_d, blockRows, sizeBlockRows*sizeof(int),cudaMemcpyHostToDevice);
-    if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix blockRows_d");
+    if (blockRows[sizeBlockRows-1] != n_global ) {
+        blockRows[sizeBlockRows] = n_global;
+    } else {
+        --sizeBlockRows;
+    } // end if //
+    ++sizeBlockRows;
 
-    /*
+/*
     printf("sizeBlockRows: %d\n", sizeBlockRows); 
     for (int i=0; i<sizeBlockRows; ++i ) {
         printf("%4d", blockRows[i]);
@@ -136,7 +128,13 @@ int main(int argc, char *argv[])
     printf("n_global: %d\n", n_global); 
     printf("\nMAXTHREADS: %d\n", MAXTHREADS); 
     printf("SHARED_SIZE: %d\n", SHARED_SIZE); exit(0);
-    */
+*/
+    
+    cuda_ret = cudaMalloc((void **) &blockRows_d,  (sizeBlockRows)*sizeof(int));
+    if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for blockRows_d array");
+
+    cuda_ret = cudaMemcpy(blockRows_d, blockRows, sizeBlockRows*sizeof(int),cudaMemcpyHostToDevice);
+    if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix blockRows_d");
     
     free(blockRows);
 //////////////////////////////////////////
