@@ -11,6 +11,7 @@
     int *rows_d, *cols_d;
     real *vals_d;
     int *blockRows_d;
+    int *wtpb_d;
     real *v_d, *w_d;
 
     // end of data for the on_proc solution

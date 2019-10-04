@@ -25,6 +25,7 @@ void alg3   (real *__restrict__ const y,
              const int  *__restrict__ const col_idx, 
              const int  *__restrict__ const row_Ptr,
              const int  *__restrict__ const blockRows_d, 
+             const int  *__restrict__ const wtpb_d, 
              const int sizeBlockRows,
              const real alpha,
              const real beta

@@ -133,6 +133,22 @@ int main(int argc, char *argv[])
     printf("\nMAXTHREADS: %d\n", MAXTHREADS); 
     printf("SHARED_SIZE: %d\n", SHARED_SIZE); exit(0);
 */
+
+    int *wtpb     =(int *) malloc( (sizeBlockRows-1)*sizeof(int));
+    
+    for (int i=0; i<sizeBlockRows-1; ++i) {
+        int ratio = MAXTHREADS / (blockRows[i+1] - blockRows[i]);
+        int temp = 1;
+        do {
+            temp = temp<<1;
+            //printf("ratio: %d, temp: %d\n",  ratio, temp);
+            if (ratio < temp)  {
+                wtpb[i] = temp>>1;
+                break;
+            } // end if //
+        } while (  temp <= MAXTHREADS );
+    } // end for //
+    
     
     cuda_ret = cudaMalloc((void **) &blockRows_d,  (sizeBlockRows)*sizeof(int));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for blockRows_d array");
@@ -140,7 +156,15 @@ int main(int argc, char *argv[])
     cuda_ret = cudaMemcpy(blockRows_d, blockRows, sizeBlockRows*sizeof(int),cudaMemcpyHostToDevice);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix blockRows_d");
     
+    cuda_ret = cudaMalloc((void **) &wtpb_d,  (sizeBlockRows-1)*sizeof(int));
+    if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory for blockRows_d array");
+
+    cuda_ret = cudaMemcpy(wtpb_d, wtpb, (sizeBlockRows-1)*sizeof(int),cudaMemcpyHostToDevice);
+    if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix blockRows_d");
+    
+    
     free(blockRows);
+    free(wtpb);
 //////////////////////////////////////////
 
 // cuda stuff start here
@@ -199,7 +223,7 @@ int main(int argc, char *argv[])
     for (int t=0; t<REP; ++t) {
 
         //alg1<<<grid, block >>>(temp,vals_d,cols_d,nnz_global);
-        alg3<<<grid, block >>>(w_d , vals_d,cols_d, rows_d,blockRows_d, sizeBlockRows, 1.0, 0.0 );
+        alg3<<<grid, block >>>(w_d , vals_d,cols_d, rows_d,blockRows_d,wtpb_d, sizeBlockRows, 1.0, 0.0 );
         cudaStreamSynchronize(NULL);
         
     } // end for //    
