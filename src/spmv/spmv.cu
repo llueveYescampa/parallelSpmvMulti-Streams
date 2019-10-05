@@ -70,7 +70,7 @@ void alg3   (real *__restrict__ const y,
         } else {
             int workingRow=tid/wtpr;
             int line = tid % wtpr;
-            real sum=static_cast<real> (0);    
+
             if (tid < (endRow-starRow) * wtpr ) {
                 real sum = static_cast<real> (0);
                 int row_s = row_Ptr[starRow + workingRow ]    - firstCol + line;
