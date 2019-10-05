@@ -21,8 +21,6 @@
     //texture<float> valTex;
 #endif
 
-
-
 int main(int argc, char *argv[]) 
 {
     #include "parallelSpmvData.h"
@@ -102,14 +100,14 @@ int main(int argc, char *argv[])
             nRows=0;
             sum=0;
         } else if (sum > SHARED_SIZE) {
-            if (row_ptr[row+1] - row_ptr[row] < SHARED_SIZE) {
+            if (nRows>1) {
                 blockRows[sizeBlockRows] = row;
-                nRows=0;
                 --row;
             } else {
                 blockRows[sizeBlockRows] = row+1;
             } // end if //
             ++sizeBlockRows;
+            nRows=0;
             sum=0;
         } // end if //
     } // end for //
