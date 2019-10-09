@@ -23,6 +23,10 @@
 
 int main(int argc, char *argv[]) 
 {
+    if (MAXTHREADS > 512) {
+        printf("need to adjust the ipcsr() function to acomodate more than 512 threads per block\nQuitting ....\n");
+        exit(-1);
+    } // end if //
     #include "parallelSpmvData.h"
 
     // verifing number of input parameters //
@@ -221,7 +225,7 @@ int main(int argc, char *argv[])
     for (int t=0; t<REP; ++t) {
 
         //alg1<<<grid, block >>>(temp,vals_d,cols_d,nnz_global);
-        alg3<<<grid, block >>>(w_d , vals_d,cols_d, rows_d,blockRows_d,wtpb_d, sizeBlockRows, 1.0, 0.0 );
+        ipcsr<<<grid, block >>>(w_d , vals_d,cols_d, rows_d,blockRows_d,wtpb_d, sizeBlockRows, 1.0, 0.0 );
         cudaStreamSynchronize(NULL);
         
     } // end for //    

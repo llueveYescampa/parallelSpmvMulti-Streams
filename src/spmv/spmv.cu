@@ -1,4 +1,4 @@
-#include <stdio.h>
+//#include <stdio.h>
 #include "real.h"
 #include "parallelSpmv.h"
 
@@ -25,7 +25,7 @@
     } // end of fetch_double() //
 #endif
 __global__ 
-void alg3   (real *__restrict__ const y, 
+void ipcsr  (real *__restrict__ const y, 
              const real *__restrict__ const val, 
              const int  *__restrict__ const col_idx, 
              const int  *__restrict__ const row_Ptr,
@@ -82,6 +82,16 @@ void alg3   (real *__restrict__ const y,
                 bVal_s[tid] = sum;
                 __syncthreads();
 
+                if (line < 256 && wtpr >=512) {
+                    bVal_s[tid] += bVal_s[tid+256];
+                    __syncthreads();
+                } // end if //
+
+                if (line < 128 && wtpr >=256) {
+                    bVal_s[tid] += bVal_s[tid+128];
+                    __syncthreads();
+                } // end if //
+
                 if (line < 64 && wtpr >=128) {
                     bVal_s[tid] += bVal_s[tid+64];
                     __syncthreads();
@@ -125,7 +135,6 @@ void alg3   (real *__restrict__ const y,
             } // end if //
         } // endif    
     } else {
-        //if (tid==0) printf("first implemention, nnz: %d, at row: %d, sR: %d, eR: %d\n", nnz,starRow+1,starRow, endRow );
         real sum=static_cast<real>(0);
         for (int i=tid; i<nnz; i+=blockDim.x) {
             sum += val[firstCol+i] * fetch_real( xTex, col_idx[firstCol+i]);
@@ -134,41 +143,49 @@ void alg3   (real *__restrict__ const y,
         
         __syncthreads();
 
-        if (tid < 64) {
+        if (tid < 256 && blockDim.x > 256) {
+            bVal_s[tid] += bVal_s[tid+256];
+            __syncthreads();
+        } // end if //
+
+
+        if (tid < 128 && blockDim.x > 128) {
+            bVal_s[tid] += bVal_s[tid+128];
+            __syncthreads();
+        } // end if //
+
+        if (tid < 64 && blockDim.x > 64) {
             bVal_s[tid] += bVal_s[tid+64];
             __syncthreads();
         } // end if //
         
-        if (tid < 32) {
+        if (tid < 32 && blockDim.x > 32) {
             bVal_s[tid] += bVal_s[tid+32];
             __syncthreads();
         } // end if //
-
+        volatile real *shem = bVal_s;
         if (tid < 16) {
-            bVal_s[tid] += bVal_s[tid+16];
-            __syncthreads();
+            shem[tid] += shem[tid+16];
+            //__syncthreads();
         } // end if //
         
         if (tid < 8) {
-            bVal_s[tid] += bVal_s[tid+8];
-            __syncthreads();
+            shem[tid] += shem[tid+8];
+            //__syncthreads();
         } // end if //
         
         if (tid < 4) {
-            bVal_s[tid] += bVal_s[tid+4];
-            __syncthreads();
+            shem[tid] += shem[tid+4];
+            //__syncthreads();
         } // end if //
         
         if (tid < 2) {
-            bVal_s[tid] += bVal_s[tid+2];
-            __syncthreads();
+            shem[tid] += shem[tid+2];
+            //__syncthreads();
         } // end if //
         
         if (tid < 1) {
             y[starRow] = beta*y[starRow]  + alpha * (bVal_s[tid] + bVal_s[tid+1] );
         } // end if //
-        
-        
     } // end if //
-
-} // end of alg3() //
+} // end of ipcsr() //

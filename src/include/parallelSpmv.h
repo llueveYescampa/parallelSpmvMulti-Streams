@@ -1,5 +1,5 @@
-#define MAXTHREADS 128
-#define SHARED_SIZE 1024
+#define MAXTHREADS 256
+#define SHARED_SIZE 768
 #ifndef PARALLELSPMV
 #define PARALLELSPMV
 
@@ -20,7 +20,7 @@ void alg1   (      real *__restrict__ const temp,
 
 
 __global__ 
-void alg3   (real *__restrict__ const y, 
+void ipcsr  (real *__restrict__ const y, 
              const real *__restrict__ const val, 
              const int  *__restrict__ const col_idx, 
              const int  *__restrict__ const row_Ptr,
