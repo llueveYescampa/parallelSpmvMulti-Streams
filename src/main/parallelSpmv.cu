@@ -12,7 +12,7 @@
     } while(0)
 
 #define MAXTHREADS 128
-#define REP 1
+#define REP 1000
 
 #ifdef DOUBLE
     texture<int2>  xTex;
