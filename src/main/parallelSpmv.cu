@@ -212,7 +212,7 @@ int main(int argc, char *argv[])
     grid.z = 1;
 
     block.y=MAXTHREADS/block.x;
-    printf("using vector spmv for on matrix,  blockSize: [%d, %d]\n",block.x,block.y  ) ;
+    printf("using ipcsr() spmv for on matrix,  blockSize: [%d, %d]\n",block.x,block.y  ) ;
 
     // Timing should begin here//
     cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
