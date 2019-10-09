@@ -58,6 +58,62 @@ void spmv(real *__restrict__ y,
 
     if (row < nRows) {
         volatile real *temp1 = temp;
+        
+        for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
+            //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+            temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+        } // end for //
+
+       __syncthreads();
+
+        if (threadIdx.x<256 && blockDim.x>256) {
+            temp[sharedMemIndx] += temp[sharedMemIndx + 256];
+            __syncthreads();
+        } // end if //
+
+        if (threadIdx.x<128 && blockDim.x>128) {
+            temp[sharedMemIndx] += temp[sharedMemIndx + 128];
+            __syncthreads();
+        } // end if //
+       
+        if (threadIdx.x<64 && blockDim.x>64) {
+            temp[sharedMemIndx] += temp[sharedMemIndx + 64];
+            __syncthreads();
+        } // end if //
+        // unrolling warp 
+        
+        if (threadIdx.x < 32 && blockDim.x>32) {
+            temp1[sharedMemIndx] += temp1[sharedMemIndx  + 32];
+        } // end if //
+        
+        if (threadIdx.x < 16 && blockDim.x>16) {
+            temp1[sharedMemIndx] += temp1[sharedMemIndx  + 16];
+        } // end if //
+        
+        if (threadIdx.x < 8 && blockDim.x>8) {
+            temp1[sharedMemIndx] += temp1[sharedMemIndx  + 8];
+        } // end if //
+        
+        if (threadIdx.x < 4 && blockDim.x>4) {
+            temp1[sharedMemIndx] += temp1[sharedMemIndx  + 4];
+        } // end if //
+
+        if (threadIdx.x < 2 && blockDim.x>2) {
+            temp1[sharedMemIndx] += temp1[sharedMemIndx  + 2];
+        } // end if //
+
+        if (threadIdx.x < 1 && blockDim.x>1) {
+            temp1[sharedMemIndx] += temp1[sharedMemIndx  + 1];
+        } // end if //
+
+        if ((sharedMemIndx % blockDim.x)  == 0) {
+            //y[row] += temp[sharedMemIndx];
+            y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+        } // end if //   
+
+
+        
+        /*
         switch((blockDim.x)) {
             case 1  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
@@ -72,13 +128,9 @@ void spmv(real *__restrict__ y,
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
                 } // end for //
 
-                // unrolling warp 
-                if (threadIdx.x < 1) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
                 } // end if //   
                 break; 
             case 4  :
@@ -90,11 +142,11 @@ void spmv(real *__restrict__ y,
                 // unrolling warp 
                 if (threadIdx.x < 2) {
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
+                    //temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
                 } // end if //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
                 } // end if //   
                 break; 
             case 8  :
@@ -107,11 +159,11 @@ void spmv(real *__restrict__ y,
                 if (threadIdx.x < 4) {
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
+                    //temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
                 } // end if //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
                 } // end if //   
                 break; 
             case 16  :
@@ -125,11 +177,11 @@ void spmv(real *__restrict__ y,
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  8];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
+                    //temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
                 } // end if //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
                 } // end if //   
                 break;
                 
@@ -145,11 +197,11 @@ void spmv(real *__restrict__ y,
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  8];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
+                    //temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
                 } // end if //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
                 } // end if //   
                 break; 
             case 64  :
@@ -166,12 +218,12 @@ void spmv(real *__restrict__ y,
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
+                    //temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
                 } // end if //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
                 } // end if //   
                 break; 
             case 128  :
@@ -191,14 +243,16 @@ void spmv(real *__restrict__ y,
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
+                    //temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
                 } // end if //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
                 } // end if //   
                 break; 
         } // end switch //
+        
+        */
     } // end if    
 } // end of spmv() //

@@ -246,9 +246,12 @@ int main(int argc, char *argv[])
             block[s].x=warpSize;
         }  else if (limit < 1000.0 ) {
             block[s].x=warpSize*2;
-        }  else {
+        }  else if (limit < 2000.0 ) {
             block[s].x=warpSize*4;
+        }  else {
+            block[s].x=warpSize*8;
         } // end if //
+        if (block[s].x > MAXTHREADS) block[s].x=MAXTHREADS;
         
         block[s].y=MAXTHREADS/block[s].x;
         grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
