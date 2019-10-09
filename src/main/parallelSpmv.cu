@@ -12,7 +12,7 @@
     } while(0)
 
 #define MAXTHREADS 128
-#define REP 1000
+#define REP 1
 
 #ifdef DOUBLE
     texture<int2>  xTex;
@@ -42,6 +42,10 @@ void meanAndSd(real *mean, real *sd,real *data, int n)
 
 int main(int argc, char *argv[]) 
 {
+    if (MAXTHREADS > 512) {
+        printf("need to adjust the spmv() function to acomodate more than 512 threads per block\nQuitting ....\n");
+        exit(-1);
+    } // end if //
     #include "parallelSpmvData.h"
 
     // verifing number of input parameters //
@@ -248,8 +252,10 @@ int main(int argc, char *argv[])
             block[s].x=warpSize*2;
         }  else if (limit < 2000.0 ) {
             block[s].x=warpSize*4;
-        }  else {
+        }  else if (limit < 4000.0 ) {
             block[s].x=warpSize*8;
+        }  else {
+            block[s].x=warpSize*16;
         } // end if //
         if (block[s].x > MAXTHREADS) block[s].x=MAXTHREADS;
         
