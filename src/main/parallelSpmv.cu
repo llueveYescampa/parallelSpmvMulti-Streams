@@ -99,14 +99,17 @@ int main(int argc, char *argv[])
         if ( !fread(&tmpMean, sizeof(double), (size_t) 1, fh)) exit(0);
         if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
         // determining number of streams based on mean and sd
-        int streams = 0.1*tmpSD/tmpMean;
-        if (streams > nStreams && streams < MAX_STREAMS) {
-            nStreams = streams;
-        } else if (streams > MAX_STREAMS) {
-            nStreams = MAX_STREAMS;
+        real ratio = tmpSD/tmpMean;
+        if (ratio < 1.0 && tmpSD < 70.0) {
+            nStreams = 1;
+            printf("nStreams: %d\n", nStreams);
+        } else if (ratio > 85.0) {
+            nStreams = 5;
+            printf("nStreams: %d\n", nStreams);
+        } else  {
+            nStreams = 4;
         } // end if //
     } // end if //
-
     if (fh) fclose(fh);
     
     
