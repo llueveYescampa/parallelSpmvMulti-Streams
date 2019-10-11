@@ -11,7 +11,7 @@
         exit(-1);\
     } while(0)
 
-#define MAXTHREADS 128
+#define MAXTHREADS 256
 #define REP 1000
 
 #ifdef DOUBLE
