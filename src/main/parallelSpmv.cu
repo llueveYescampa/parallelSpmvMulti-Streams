@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
         if (ratio < 0.5 && tmpSD < 60.0) {
             nStreams = 1;
             printf("nStreams: %d\n", nStreams);
-        } else if (ratio > 85.0) {
+        } else if (tmpSD > 85.0) {
             nStreams = 5;
             printf("nStreams: %d\n", nStreams);
         } else  {
