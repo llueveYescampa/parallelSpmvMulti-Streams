@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
         if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
         // determining number of streams based on mean and sd
         real ratio = tmpSD/tmpMean;
-        if (ratio < 1.0 && tmpSD < 70.0) {
+        if (ratio < 0.5 && tmpSD < 60.0) {
             nStreams = 1;
             printf("nStreams: %d\n", nStreams);
         } else if (ratio > 85.0) {
