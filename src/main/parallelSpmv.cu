@@ -255,14 +255,18 @@ int main(int argc, char *argv[])
             block[s].x=warpSize*2;
         }  else if (limit < 2000.0 ) {
             block[s].x=warpSize*4;
-        }  else if (limit < 4000.0 ) {
+        }  else if (limit < 3000.0 ) {
             block[s].x=warpSize*8;
         }  else {
             block[s].x=warpSize*16;
         } // end if //
-        if (block[s].x > MAXTHREADS) block[s].x=MAXTHREADS;
+        if (block[s].x > MAXTHREADS) {
+            block[s].x=512;
+            block[s].y=1;
+        } else {
+            block[s].y=MAXTHREADS/block[s].x;
+        } // end if //    
         
-        block[s].y=MAXTHREADS/block[s].x;
         grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
     	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
         printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
