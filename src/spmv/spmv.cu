@@ -1,39 +1,52 @@
 //#include <stdio.h>
-#include "real.h"
+#include "parallelSpmv.h"
 
-#ifdef DOUBLE
-    extern texture<int2> xTex;
-    //extern texture<int2> valTex;
-#else
-    extern texture<float> xTex;
-    //extern texture<float> valTex;
-#endif
+#ifdef USE_TEXTURE
+    #ifdef DOUBLE
+        extern texture<int2> xTex;
+        //extern texture<int2> valTex;
+    #else
+        extern texture<float> xTex;
+        //extern texture<float> valTex;
+    #endif
 
-#ifdef DOUBLE
-    static __inline__ __device__ 
-    double fetch_real(texture<int2> t, int i)
-    {
-	    int2 v = tex1Dfetch(t,i);
-	    return __hiloint2double(v.y, v.x);
-    } // end of fetch_real() //
-#else
-    static __inline__ __device__ 
-    float fetch_real(texture<float> t, int i)
-    {
-	    return tex1Dfetch(t,i);
-    } // end of fetch_double() //
+    #ifdef DOUBLE
+        static __inline__ __device__ 
+        double fetch_real(texture<int2> t, int i)
+        {
+	        int2 v = tex1Dfetch(t,i);
+	        return __hiloint2double(v.y, v.x);
+        } // end of fetch_real() //
+    #else
+        static __inline__ __device__ 
+        float fetch_real(texture<float> t, int i)
+        {
+	        return tex1Dfetch(t,i);
+        } // end of fetch_double() //
+    #endif
 #endif
 
 __global__ 
-void spmv(real *__restrict__ y, 
-           //real *__restrict__ x, 
-           real *__restrict__ val, 
-           int  *__restrict__ row_ptr, 
-           int  *__restrict__ col_idx, 
+#ifdef USE_TEXTURE
+void spmv(       real *__restrict__       y,
+           const real *__restrict__ const val, 
+           const int  *__restrict__ const row_ptr, 
+           const int  *__restrict__ const col_idx, 
            const int nRows,
            const real alpha,
            const real beta
           )
+#else
+void spmv(       real *__restrict__       y, 
+           const real *__restrict__ const x, 
+           const real *__restrict__ const val, 
+           const int  *__restrict__ const row_ptr, 
+           const int  *__restrict__ const col_idx, 
+           const int nRows,
+           const real alpha,
+           const real beta
+          )
+#endif
 {   
     extern __shared__ real temp[];
     int row,col;
@@ -62,15 +75,21 @@ void spmv(real *__restrict__ y,
         switch((blockDim.x)) {
             case 1  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#ifdef USE_TEXTURE
+                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
                 y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
                 break; 
             case 2  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
@@ -79,8 +98,11 @@ void spmv(real *__restrict__ y,
                 break; 
             case 4  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
 
                 // unrolling warp 
@@ -95,8 +117,11 @@ void spmv(real *__restrict__ y,
                 break; 
             case 8  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
               
                 // unrolling warp 
@@ -112,8 +137,11 @@ void spmv(real *__restrict__ y,
                 break; 
             case 16  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
               
                 // unrolling warp 
@@ -131,8 +159,11 @@ void spmv(real *__restrict__ y,
                 
             case 32  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
               
                 // unrolling warp 
@@ -150,8 +181,11 @@ void spmv(real *__restrict__ y,
                 break; 
             case 64  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
                __syncthreads();
                
@@ -172,8 +206,11 @@ void spmv(real *__restrict__ y,
                 break; 
             case 128  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
                __syncthreads();
                
@@ -197,8 +234,11 @@ void spmv(real *__restrict__ y,
                 break; 
             case 256  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
                __syncthreads();
 
@@ -225,8 +265,11 @@ void spmv(real *__restrict__ y,
                 break; 
             case 512  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
-                    //temp[threadIdx.x] += (val[col] * x[col_idx[col]]);
+#ifdef USE_TEXTURE
                     temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+#else
+                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+#endif
                 } // end for //
                __syncthreads();
 

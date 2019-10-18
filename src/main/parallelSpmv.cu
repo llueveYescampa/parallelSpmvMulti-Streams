@@ -1,8 +1,8 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
-#include "real.h"
 #include "parallelSpmv.h"
 
 #define FATAL(msg) \
@@ -14,13 +14,17 @@
 #define MAXTHREADS 256
 #define REP 1000
 
-#ifdef DOUBLE
-    texture<int2>  xTex;
-    //texture<int2>  valTex;
-#else
-    texture<float> xTex;
-    //texture<float> valTex;
+
+#ifdef USE_TEXTURE
+    #ifdef DOUBLE
+        texture<int2>  xTex;
+        //texture<int2>  valTex;
+    #else
+        texture<float> xTex;
+        //texture<float> valTex;
+    #endif
 #endif
+
 
 void meanAndSd(real *mean, real *sd,real *data, int n)
 {
@@ -42,6 +46,7 @@ void meanAndSd(real *mean, real *sd,real *data, int n)
 
 int main(int argc, char *argv[]) 
 {
+
     if (MAXTHREADS > 512) {
         printf("need to adjust the spmv() function to acomodate more than 512 threads per block\nQuitting ....\n");
         exit(-1);
@@ -274,8 +279,13 @@ int main(int argc, char *argv[])
     } // end for //
 
     // Timing should begin here//
+    
+#ifdef USE_TEXTURE
     cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
     //cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));            
+#else
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+#endif
 
     struct timeval tp;                                   // timer
     double elapsed_time;
@@ -289,7 +299,11 @@ int main(int argc, char *argv[])
         for (int s=0; s<nStreams; ++s) {
             const int sRow = starRow[s];
             const int nrows = starRow[s+1]-starRow[s];
+#ifdef USE_TEXTURE
             spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
+#else
+            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), v_d,vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
+#endif
         } // end for //
         
         for (int s=0; s<nStreams; ++s) {
@@ -301,8 +315,11 @@ int main(int argc, char *argv[])
     gettimeofday(&tp,NULL);
     elapsed_time += (tp.tv_sec*1.0e6 + tp.tv_usec);
     printf ("Total time was %f seconds, GFLOPS: %f\n", elapsed_time*1.0e-6, (2.0*nnz_global+ 3.0*n_global)*REP*1.0e-3/elapsed_time);
+
+#ifdef USE_TEXTURE
     cuda_ret = cudaUnbindTexture(xTex);
     //cuda_ret = cudaUnbindTexture(valTex);
+#endif
 
     cuda_ret = cudaMemcpy(w, w_d, (n_global)*sizeof(real),cudaMemcpyDeviceToHost);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix y_d back to host");
