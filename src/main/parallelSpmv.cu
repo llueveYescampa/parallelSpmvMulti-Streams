@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -13,18 +12,6 @@
 
 #define MAXTHREADS 256
 #define REP 1000
-
-
-#ifdef USE_TEXTURE
-    #ifdef DOUBLE
-        texture<int2>  xTex;
-        //texture<int2>  valTex;
-    #else
-        texture<float> xTex;
-        //texture<float> valTex;
-    #endif
-#endif
-
 
 void meanAndSd(real *mean, real *sd,real *data, int n)
 {
@@ -179,6 +166,43 @@ int main(int argc, char *argv[])
 
 
 
+#ifdef USE_TEXTURE
+
+    cudaTextureDesc td;
+    memset(&td, 0, sizeof(td));
+    td.normalizedCoords = 0;
+    td.addressMode[0] = cudaAddressModeClamp;
+    td.readMode = cudaReadModeElementType;
+
+
+    struct cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeLinear;
+    resDesc.res.linear.devPtr = v_d;
+    resDesc.res.linear.sizeInBytes = n_global*sizeof(real);
+    #ifdef DOUBLE
+    resDesc.res.linear.desc.f = cudaChannelFormatKindUnsigned;
+    resDesc.res.linear.desc.y = 32;
+    #else
+    resDesc.res.linear.desc.f = cudaChannelFormatKindFloat;
+    #endif
+    resDesc.res.linear.desc.x = 32;
+
+    cudaTextureObject_t v_t;
+    cuda_ret = cudaCreateTextureObject(&v_t, &resDesc, &td, NULL);
+    if(cuda_ret != cudaSuccess) FATAL("Unable to create text memory v_t");
+
+    
+/*
+    cuda_ret = cudaBindTexture(NULL, v_t, v_d, n_global*sizeof(real));
+    //cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));            
+*/    
+#else
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+#endif
+
+
+
     meanNnzPerRow = (real*) malloc(nStreams*sizeof(real));
     sd            = (real*) malloc(nStreams*sizeof(real ));
     block = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
@@ -280,12 +304,6 @@ int main(int argc, char *argv[])
 
     // Timing should begin here//
     
-#ifdef USE_TEXTURE
-    cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
-    //cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));            
-#else
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-#endif
 
     struct timeval tp;                                   // timer
     double elapsed_time;
@@ -300,9 +318,9 @@ int main(int argc, char *argv[])
             const int sRow = starRow[s];
             const int nrows = starRow[s+1]-starRow[s];
 #ifdef USE_TEXTURE
-            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
+            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), v_t, vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
 #else
-            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), v_d,vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
+            spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), v_d,  vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
 #endif
         } // end for //
         
@@ -315,11 +333,6 @@ int main(int argc, char *argv[])
     gettimeofday(&tp,NULL);
     elapsed_time += (tp.tv_sec*1.0e6 + tp.tv_usec);
     printf ("Total time was %f seconds, GFLOPS: %f\n", elapsed_time*1.0e-6, (2.0*nnz_global+ 3.0*n_global)*REP*1.0e-3/elapsed_time);
-
-#ifdef USE_TEXTURE
-    cuda_ret = cudaUnbindTexture(xTex);
-    //cuda_ret = cudaUnbindTexture(valTex);
-#endif
 
     cuda_ret = cudaMemcpy(w, w_d, (n_global)*sizeof(real),cudaMemcpyDeviceToHost);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix y_d back to host");

@@ -1,5 +1,5 @@
 # define DEFAULT_STREAMS 4
-# define MAX_STREAMS 16
+//# define MAX_STREAMS 16
 
     int n_global,nnz_global;
     int nStreams=DEFAULT_STREAMS;
