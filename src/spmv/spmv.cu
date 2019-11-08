@@ -53,10 +53,6 @@ void spmv(       real *__restrict__       y,
 {   
     extern __shared__ real shared[]; 
 
-
-    real *temp = shared; // borrar despues
-
-
     int row,col;
     row = blockIdx.x*blockDim.y + threadIdx.y;
     real answer = static_cast<real>(0.0);
