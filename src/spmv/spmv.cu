@@ -51,253 +51,227 @@ void spmv(       real *__restrict__       y,
           )
 #endif
 {   
-    extern __shared__ real temp[];
-    int row,col;
-/*
-    if (blockDim.y==1) { 
-        row = blockIdx.x*blockDim.x + threadIdx.x;
-        if (row < nRows)  {
-            real dot = (real) 0.0;
-            for (col = row_ptr[row]; col < row_ptr[row+1]; ++col ) {
-                //dot += (val[col] * x[col_idx[col]]);
-                dot += (val[col] * fetch_real( xTex, col_idx[col])); 
-            } // end for //
-            y[row] = beta * y[row] + alpha*dot;
-        } // end if //
-        return ;
-    } // end if //
-*/
+    extern __shared__ real shared[]; 
 
+
+    real *temp = shared; // borrar despues
+
+
+    int row,col;
     row = blockIdx.x*blockDim.y + threadIdx.y;
-    const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
-    temp[sharedMemIndx] = (real) 0.0;
+    real answer = static_cast<real>(0.0);
+
+    const int warpSize = (blockDim.x < 32) ? blockDim.x: 32;
+    int thread_0 = threadIdx.x % warpSize;
+    int warpID =  threadIdx.x / warpSize;
+    int nWarps = blockDim.x/warpSize;
 
     if (row < nRows) {
-        volatile real *temp1 = temp;
-        
         switch((blockDim.x)) {
             case 1  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
-                y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                y[row] =  beta * y[row] + alpha*answer;
                 break; 
             case 2  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
+
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
             case 4  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
 
-                // unrolling warp 
-                if (threadIdx.x < 2) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
             case 8  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
               
-                // unrolling warp 
-                if (threadIdx.x < 4) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
-                } // end if //
+                answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
             case 16  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
               
-                // unrolling warp 
-                if (threadIdx.x < 8) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
-                } // end if //
+                answer +=   __shfl_down_sync(0xffffffff, answer, 8);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break;
                 
             case 32  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
               
-                // unrolling warp 
-                if (threadIdx.x < 16) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
-                } // end if //
+                answer +=   __shfl_down_sync(0xffffffff, answer, 16);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 8);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
             case 64  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
-               __syncthreads();
-               
-                // unrolling warp 
-                if (threadIdx.x < 32) {
-                    temp[sharedMemIndx]  += temp[sharedMemIndx  + 32];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
+              
+                answer +=   __shfl_down_sync(0xffffffff, answer, 16);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 8);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                if (thread_0 == 0) shared[threadIdx.y*nWarps + warpID] = answer;
+                __syncthreads();
+                answer = (threadIdx.x < nWarps ) ? shared[threadIdx.y*nWarps + thread_0] : 0.0;
+                if (warpID == 0) {
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 1);
+                } // end if //
+                
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
             case 128  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
-               __syncthreads();
-               
-                if (threadIdx.x<64) temp[sharedMemIndx] += temp[sharedMemIndx + 64];
-                __syncthreads();
-                
-                // unrolling warp 
-                if (threadIdx.x < 32) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 32];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
-                } // end if //
+              
+                answer +=   __shfl_down_sync(0xffffffff, answer, 16);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 8);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                if (thread_0 == 0) shared[threadIdx.y*nWarps + warpID] = answer;
+                __syncthreads();
+                answer = (threadIdx.x < nWarps ) ? shared[threadIdx.y*nWarps + thread_0] : 0.0;
+                if (warpID == 0) {
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 1);
+                } // end if //
+                
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
             case 256  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
-               __syncthreads();
+              
+                answer +=   __shfl_down_sync(0xffffffff, answer, 16);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 8);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if (threadIdx.x<128) temp[sharedMemIndx] += temp[sharedMemIndx + 128];
+                if (thread_0 == 0) shared[threadIdx.y*nWarps + warpID] = answer;
                 __syncthreads();
-               
-                if (threadIdx.x<64) temp[sharedMemIndx] += temp[sharedMemIndx + 64];
-                __syncthreads();
-                
-                // unrolling warp 
-                if (threadIdx.x < 32) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 32];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
+                answer = (threadIdx.x < nWarps ) ? shared[threadIdx.y*nWarps + thread_0] : 0.0;
+                if (warpID == 0) {
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 1);
                 } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
             case 512  :
                 for (col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
 #ifdef USE_TEXTURE
-                    temp[ sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    answer += (val[col] * fetch_real( xTex, col_idx[col]));
 #else
-                    temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+                    answer += (val[col] * x[col_idx[col]]);
 #endif
                 } // end for //
-               __syncthreads();
+              
+                answer +=   __shfl_down_sync(0xffffffff, answer, 16);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 8);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                answer +=   __shfl_down_sync(0xffffffff, answer, 1);
 
-                if (threadIdx.x<256) temp[sharedMemIndx] += temp[sharedMemIndx + 256];
+                if (thread_0 == 0) shared[threadIdx.y*nWarps + warpID] = answer;
                 __syncthreads();
-
-                if (threadIdx.x<128) temp[sharedMemIndx] += temp[sharedMemIndx + 128];
-                __syncthreads();
-               
-                if (threadIdx.x<64) temp[sharedMemIndx] += temp[sharedMemIndx + 64];
-                __syncthreads();
-                
-                // unrolling warp 
-                if (threadIdx.x < 32) {
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 32];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 2];
-                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
+                answer = (threadIdx.x < nWarps ) ? shared[threadIdx.y*nWarps + thread_0] : 0.0;
+                if (warpID == 0) {
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 8);
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 4);
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 2);
+                    answer +=   __shfl_down_sync(0xffffffff, answer, 1);
                 } // end if //
-
-                if ((sharedMemIndx % blockDim.x)  == 0) {
-                    //y[row] += temp[sharedMemIndx];
-                    y[row] =  beta * y[row] + alpha*temp[sharedMemIndx];
+                
+                if (threadIdx.x == 0) {
+                    y[row] =  beta * y[row] + alpha*answer;
                 } // end if //   
                 break; 
         } // end switch //

@@ -197,11 +197,9 @@ int main(int argc, char *argv[])
     cuda_ret = cudaBindTexture(NULL, v_t, v_d, n_global*sizeof(real));
     //cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));            
 */    
-#else
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 #endif
 
-
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
     meanNnzPerRow = (real*) malloc(nStreams*sizeof(real));
     sd            = (real*) malloc(nStreams*sizeof(real ));
@@ -297,7 +295,7 @@ int main(int argc, char *argv[])
         } // end if //    
         
         grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
-    	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
+        sharedMemorySize[s]= (block[s].x <= 32) ? 0:(block[s].x/warpSize) * block[s].y * sizeof(real);
         printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
 
     } // end for //
