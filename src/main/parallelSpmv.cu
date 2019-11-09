@@ -371,10 +371,6 @@ int main(int argc, char *argv[])
 #ifdef USE_TEXTURE
     cudaDestroyTextureObject(v_t);
 #endif
-
-
-
-    
     #include "parallelSpmvCleanData.h" 
     return 0;    
 } // end main() //
