@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
     td.readMode = cudaReadModeElementType;
 
 
-    struct cudaResourceDesc resDesc;
+    cudaResourceDesc resDesc;
     memset(&resDesc, 0, sizeof(resDesc));
     resDesc.resType = cudaResourceTypeLinear;
     resDesc.res.linear.devPtr = v_d;
@@ -367,6 +367,13 @@ int main(int argc, char *argv[])
     } // end if //
     free(w);
     free(v);
+
+#ifdef USE_TEXTURE
+    cudaDestroyTextureObject(v_t);
+#endif
+
+
+
     
     #include "parallelSpmvCleanData.h" 
     return 0;    
