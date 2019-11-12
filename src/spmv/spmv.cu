@@ -53,20 +53,6 @@ void spmv(       real *__restrict__       y,
 {   
     extern __shared__ real temp[];
     int row,col;
-/*
-    if (blockDim.y==1) { 
-        row = blockIdx.x*blockDim.x + threadIdx.x;
-        if (row < nRows)  {
-            real dot = (real) 0.0;
-            for (col = row_ptr[row]; col < row_ptr[row+1]; ++col ) {
-                //dot += (val[col] * x[col_idx[col]]);
-                dot += (val[col] * fetch_real( xTex, col_idx[col])); 
-            } // end for //
-            y[row] = beta * y[row] + alpha*dot;
-        } // end if //
-        return ;
-    } // end if //
-*/
 
     row = blockIdx.x*blockDim.y + threadIdx.y;
     const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
