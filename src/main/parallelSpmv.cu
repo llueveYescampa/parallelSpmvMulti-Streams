@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
     //cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));            
 */    
 #endif
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+    //cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
 
 
