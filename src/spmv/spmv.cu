@@ -79,8 +79,13 @@ void spmv(       real *__restrict__       y,
 #endif
                 } // end for //
 
+                // unrolling warp 
+                if (threadIdx.x < 1) {
+                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 1];
+                } // end if //
+
                 if ((sharedMemIndx % blockDim.x)  == 0) {
-                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]+temp[sharedMemIndx+1]) ;
+                    y[row] =  beta * y[row] + alpha*(temp[sharedMemIndx]) ;
                 } // end if //   
                 break; 
             case 4  :
@@ -178,7 +183,7 @@ void spmv(       real *__restrict__       y,
                
                 // unrolling warp 
                 if (threadIdx.x < 32) {
-                    temp[sharedMemIndx]  += temp[sharedMemIndx  + 32];
+                    temp1[sharedMemIndx] += temp1[sharedMemIndx + 32];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 8];
                     temp1[sharedMemIndx] += temp1[sharedMemIndx + 4];
