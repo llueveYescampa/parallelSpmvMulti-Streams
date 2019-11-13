@@ -54,10 +54,10 @@ void spmv(       real *__restrict__       y,
     extern __shared__ real temp[];
     const int row = blockIdx.x*blockDim.y + threadIdx.y;
     const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
-    temp[sharedMemIndx] = (real) 0.0;
+    temp[sharedMemIndx] = static_cast<real>(0.0);
+    volatile real *temp1 = temp;
 
     if (row < nRows) {
-        volatile real *temp1 = temp;
         
         switch(blockDim.x) {
             case 1  :
@@ -201,8 +201,7 @@ void spmv(       real *__restrict__       y,
                 } // end for //
                __syncthreads();
                
-                if (threadIdx.x<64) temp[sharedMemIndx] += temp[sharedMemIndx + 64];
-                __syncthreads();
+                if (threadIdx.x< 64) { temp[sharedMemIndx] += temp[sharedMemIndx +  64]; __syncthreads(); }
                 
                 // unrolling warp 
                 if (threadIdx.x < 32) {
@@ -229,11 +228,8 @@ void spmv(       real *__restrict__       y,
                 } // end for //
                __syncthreads();
 
-                if (threadIdx.x<128) temp[sharedMemIndx] += temp[sharedMemIndx + 128];
-                __syncthreads();
-               
-                if (threadIdx.x<64) temp[sharedMemIndx] += temp[sharedMemIndx + 64];
-                __syncthreads();
+                if (threadIdx.x<128) { temp[sharedMemIndx] += temp[sharedMemIndx + 128]; __syncthreads(); }
+                if (threadIdx.x< 64) { temp[sharedMemIndx] += temp[sharedMemIndx +  64]; __syncthreads(); }
                 
                 // unrolling warp 
                 if (threadIdx.x < 32) {
@@ -260,14 +256,9 @@ void spmv(       real *__restrict__       y,
                 } // end for //
                __syncthreads();
 
-                if (threadIdx.x<256) temp[sharedMemIndx] += temp[sharedMemIndx + 256];
-                __syncthreads();
-
-                if (threadIdx.x<128) temp[sharedMemIndx] += temp[sharedMemIndx + 128];
-                __syncthreads();
-               
-                if (threadIdx.x<64) temp[sharedMemIndx] += temp[sharedMemIndx + 64];
-                __syncthreads();
+                if (threadIdx.x<256) { temp[sharedMemIndx] += temp[sharedMemIndx + 256]; __syncthreads(); }
+                if (threadIdx.x<128) { temp[sharedMemIndx] += temp[sharedMemIndx + 128]; __syncthreads(); }
+                if (threadIdx.x< 64) { temp[sharedMemIndx] += temp[sharedMemIndx +  64]; __syncthreads(); }
                 
                 // unrolling warp 
                 if (threadIdx.x < 32) {
