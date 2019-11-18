@@ -331,7 +331,10 @@ int main(int argc, char *argv[])
     } // end for //    
     gettimeofday(&tp,NULL);
     elapsed_time += (tp.tv_sec*1.0e6 + tp.tv_usec);
-    printf ("Total time was %f seconds, GFLOPS: %f\n", elapsed_time*1.0e-6, (2.0*nnz_global+ 3.0*n_global)*REP*1.0e-3/elapsed_time);
+    printf ("Total time was %f seconds, GFLOPS: %f, GBytes/s: %f\n", elapsed_time*1.0e-6, 
+                                (2.0*nnz_global+ 3.0*n_global)*REP*1.0e-3/elapsed_time,
+                                (nnz_global*(2*sizeof(real) + sizeof(int))+n_global*(sizeof(real)+sizeof(int)))*REP*1.0e-3/elapsed_time );
+    
 
     cuda_ret = cudaMemcpy(w, w_d, (n_global)*sizeof(real),cudaMemcpyDeviceToHost);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix y_d back to host");
