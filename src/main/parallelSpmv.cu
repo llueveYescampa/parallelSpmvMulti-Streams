@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
     struct timeval tp;                                   // timer
     double elapsed_time;
     gettimeofday(&tp,NULL);  // Unix timer
-    elapsed_time = -(tp.tv_sec + tp.tv_usec*1.0e-6);
+    elapsed_time = -(tp.tv_sec*1.0e6 + tp.tv_usec);
     for (int t=0; t<REP; ++t) {
 
         //alg1<<<grid, block >>>(temp,vals_d,cols_d,nnz_global);
@@ -230,8 +230,10 @@ int main(int argc, char *argv[])
         
     } // end for //    
     gettimeofday(&tp,NULL);
-    elapsed_time += (tp.tv_sec + tp.tv_usec*1.0e-6);
-    printf ("Total time was %f seconds, GFLOPS: %f\n", elapsed_time, (2.0*nnz_global+ 3.0*n_global) * 1.0e-9 / (elapsed_time/REP));
+    elapsed_time += (tp.tv_sec*1.0e6 + tp.tv_usec);
+    printf ("Total time was %f seconds, GFLOPS: %f, GBytes/s: %f\n", elapsed_time*1.0e-6, 
+                                     (2.0*nnz_global+ 3.0*n_global)*REP*1.0e-3/elapsed_time,
+                                     (nnz_global*(2*sizeof(real) + sizeof(int))+n_global*(sizeof(real)+sizeof(int)))*REP*1.0e-3/elapsed_time);
     cuda_ret = cudaUnbindTexture(xTex);
     //cuda_ret = cudaUnbindTexture(valTex);
 
