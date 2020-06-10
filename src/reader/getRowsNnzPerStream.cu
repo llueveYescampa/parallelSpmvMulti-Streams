@@ -1,8 +1,8 @@
 #include <math.h>
 
-void getRowsNnzPerStream(int *rowsPerSstream, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nStreams)
+void getRowsNnzPerStream(int *rowsPerSstream, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nRowBlocks)
 {
-    double nnzIncre = (double) *global_nnz/ (double) nStreams;
+    double nnzIncre = (double) *global_nnz/ (double) nRowBlocks;
     double lookingFor=nnzIncre;
     int startRow=0, endRow;
     int partition=0;
@@ -21,7 +21,7 @@ void getRowsNnzPerStream(int *rowsPerSstream, const int *global_n, const int *gl
              
             startRow = endRow+1;
             ++partition;
-            if (partition < nStreams-1) {
+            if (partition < nRowBlocks-1) {
                lookingFor += nnzIncre;
             } else {
                 lookingFor=*global_nnz;

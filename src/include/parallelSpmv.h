@@ -7,7 +7,7 @@
 
     void reader(int *gn, int *gnnz, int *n,  
                 int **rPtr,int **cIdx,real **v,
-                const char *matrixFile, const int nStreams);
+                const char *matrixFile, int *nRowBlocks);
 
     void vectorReader(real *v, const int *n, const char *vectorFile);
     int createColIdxMap(int **b,  int *a, const int *n);
