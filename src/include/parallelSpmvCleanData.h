@@ -1,5 +1,6 @@
     free(starRowStream);
     free(starRowBlock);
+    free(toSortStream);
     free(blockSize);
     free(row_ptr);
     free(col_idx);

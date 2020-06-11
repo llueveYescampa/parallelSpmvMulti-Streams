@@ -7,6 +7,7 @@
     int *starRowStream = NULL;
     int *starRowBlock = NULL;
     int *blockSize = NULL;
+    struct str *toSortStream = NULL;
 
     const int warpSize = 32;
     const real parameter2Adjust = 0.15;
