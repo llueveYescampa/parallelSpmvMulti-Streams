@@ -371,7 +371,7 @@ int main(int argc, char *argv[])
     for (int s=0; s<nStreams; ++s) {
         //printf("\tblock for stream %3d has size: [%3d, %3d]\n", s, block[s].x, block[s].y) ;
         int ss = toSortStream[s].index;
-        printf("\tblock for stream %3d has size: [%3d, %3d]\n", ss, block[ss].x, block[ss].y) ;
+        printf("\tblock for stream %3d has size: [%3d, %3d] and %d rows.\n", ss, block[ss].x, block[ss].y, starRowStream[ss+1]-starRowStream[ss]) ;
     } // end for //
   
   
