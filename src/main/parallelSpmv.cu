@@ -108,19 +108,22 @@ int main(int argc, char *argv[])
         real ratio = tmpSD/tmpMean;
         //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
         
-        if        (ratio <= 0.5 ) {
+        if        (ratio <= 0.25 ) {
+            nRowBlocks = 16;
+        } else if (ratio <= 0.45 ) {
             nRowBlocks = 32;
         } else if (ratio <= 1.0 ) {
             nRowBlocks = 64;
-        } else if (ratio <= 5.0 ) {
+        } else if (ratio <= 6.0 ) {
             nRowBlocks = 128;
-        } else if (ratio <= 10.0) {
+        } else if (ratio <= 8.2 ) {
             nRowBlocks = 256;
-        } else if (ratio <= 15.0) {
+        } else if (ratio <= 100.0 ) {
             nRowBlocks = 512;
-        } else  {
+        } else {
             nRowBlocks = 1024;
         } // end if //
+        
         printf("nRowBlocks: %d\n", nRowBlocks);
     } // end of determining the number of block rows based on mean and sd of the nnz 
     if (fh) fclose(fh);
@@ -257,7 +260,7 @@ int main(int argc, char *argv[])
         real limit=meanNnzPerRow[b] + parameter2Adjust*sd[b];
         if ( limit < 4.5  ) {
             blockSize[b]=warpSize/32;
-        }  else if (limit < 6.95 ) {
+        }  else if (limit < 6.50 ) {
             blockSize[b]=warpSize/16;
         }  else if (limit < 15.5 ) {
             blockSize[b]=warpSize/8;
