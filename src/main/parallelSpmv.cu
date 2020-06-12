@@ -94,17 +94,19 @@ int main(int argc, char *argv[])
         real ratio = tmpSD/tmpMean;
         //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
         
-        if        (ratio <= 0.5 ) {
+        if        (ratio <= 0.25 ) {
+            nRowBlocks = 16;
+        } else if (ratio <= 0.45 ) {
             nRowBlocks = 32;
         } else if (ratio <= 1.0 ) {
             nRowBlocks = 64;
-        } else if (ratio <= 5.0 ) {
+        } else if (ratio <= 6.0 ) {
             nRowBlocks = 128;
-        } else if (ratio <= 10.0) {
+        } else if (ratio <= 8.2 ) {
             nRowBlocks = 256;
-        } else if (ratio <= 15.0) {
+        } else if (ratio <= 100.0 ) {
             nRowBlocks = 512;
-        } else  {
+        } else {
             nRowBlocks = 1024;
         } // end if //
         printf("nRowBlocks: %d\n", nRowBlocks);
@@ -114,7 +116,6 @@ int main(int argc, char *argv[])
     if (argc  > 4  && atoi(argv[4]) > 0) {
         nRowBlocks = atoi(argv[4]);
     } // end if //
-
     
     
     printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
@@ -243,7 +244,7 @@ int main(int argc, char *argv[])
         real limit=meanNnzPerRow[b] + parameter2Adjust*sd[b];
         if ( limit < 4.5  ) {
             blockSize[b]=warpSize/32;
-        }  else if (limit < 6.95 ) {
+        }  else if (limit < 6.50 ) {
             blockSize[b]=warpSize/16;
         }  else if (limit < 15.5 ) {
             blockSize[b]=warpSize/8;
@@ -346,9 +347,8 @@ int main(int argc, char *argv[])
 */    
 
     for (int s=0; s<nStreams; ++s) {
-        printf("\tblock for stream %3d has size: [%3d, %3d]\n", s, block[s].x, block[s].y) ;
+        printf("\tblock for stream %3d has size: [%3d, %3d] and %d rows.\n", s, block[s].x, block[s].y, starRowStream[s+1]-starRowStream[s]) ;
     } // end for //
-  
   
     // Timing should begin here//
     
