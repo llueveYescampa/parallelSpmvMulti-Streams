@@ -94,20 +94,26 @@ int main(int argc, char *argv[])
         real ratio = tmpSD/tmpMean;
         //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
         
-        if        (ratio <= 0.25 ) {
+        if        (ratio <= 0.220 ) {
+            nRowBlocks = 1;
+        } else if (ratio <= 0.275 ) {
+            nRowBlocks = 2;
+        } else if (ratio <= 0.420 ) {
+            nRowBlocks = 4;
+        } else if (ratio <= 0.65 ) {
+            nRowBlocks = 8;
+        } else if (ratio <= 0.75 ) {
             nRowBlocks = 16;
-        } else if (ratio <= 0.45 ) {
+        } else if (ratio <= 8.20 ) {
             nRowBlocks = 32;
-        } else if (ratio <= 1.0 ) {
+        } else if (ratio <= 12.0 ) {
             nRowBlocks = 64;
-        } else if (ratio <= 6.0 ) {
+        } else if (ratio <= 18.00 ) {
             nRowBlocks = 128;
-        } else if (ratio <= 8.2 ) {
+        } else if (ratio <= 25.00 ) {
             nRowBlocks = 256;
-        } else if (ratio <= 100.0 ) {
-            nRowBlocks = 512;
         } else {
-            nRowBlocks = 1024;
+            nRowBlocks = 512;
         } // end if //
         printf("nRowBlocks: %d\n", nRowBlocks);
     } // end of determining the number of block rows based on mean and sd of the nnz 
@@ -244,7 +250,7 @@ int main(int argc, char *argv[])
         real limit=meanNnzPerRow[b] + parameter2Adjust*sd[b];
         if ( limit < 4.5  ) {
             blockSize[b]=warpSize/32;
-        }  else if (limit < 6.50 ) {
+        }  else if (limit < 6.95 ) {
             blockSize[b]=warpSize/16;
         }  else if (limit < 15.5 ) {
             blockSize[b]=warpSize/8;
@@ -351,7 +357,6 @@ int main(int argc, char *argv[])
     } // end for //
   
     // Timing should begin here//
-    
 
     struct timeval tp;                                   // timer
     double elapsed_time;
