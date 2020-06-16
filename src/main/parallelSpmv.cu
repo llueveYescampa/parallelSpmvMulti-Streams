@@ -118,9 +118,9 @@ int main(int argc, char *argv[])
             nRowBlocks = 8;
         } else if (ratio <= 0.75 ) {
             nRowBlocks = 16;
-        } else if (ratio <= 8.20 ) {
+        } else if (ratio <= 2.20 ) {
             nRowBlocks = 32;
-        } else if (ratio <= 12.0 ) {
+        } else if (ratio <= 8.20 ) {
             nRowBlocks = 64;
         } else if (ratio <= 60.00 ) {
             nRowBlocks = 128;
@@ -129,7 +129,6 @@ int main(int argc, char *argv[])
         } else {
             nRowBlocks = 512;
         } // end if //
-
         printf("nRowBlocks: %d\n", nRowBlocks);
     } // end of determining the number of block rows based on mean and sd of the nnz 
     if (fh) fclose(fh);
