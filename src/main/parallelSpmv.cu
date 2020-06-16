@@ -104,13 +104,13 @@ int main(int argc, char *argv[])
             nRowBlocks = 8;
         } else if (ratio <= 0.75 ) {
             nRowBlocks = 16;
-        } else if (ratio <= 8.00 ) {
+        } else if (ratio <= 8.20 ) {
             nRowBlocks = 32;
         } else if (ratio <= 12.0 ) {
             nRowBlocks = 64;
-        } else if (ratio <= 30.00 ) {
+        } else if (ratio <= 60.00 ) {
             nRowBlocks = 128;
-        } else if (ratio <= 100.00 ) {
+        } else if (ratio <= 120.00 ) {
             nRowBlocks = 256;
         } else {
             nRowBlocks = 512;
