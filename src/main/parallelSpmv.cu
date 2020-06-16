@@ -122,9 +122,9 @@ int main(int argc, char *argv[])
             nRowBlocks = 32;
         } else if (ratio <= 12.0 ) {
             nRowBlocks = 64;
-        } else if (ratio <= 18.00 ) {
+        } else if (ratio <= 20.00 ) {
             nRowBlocks = 128;
-        } else if (ratio <= 25.00 ) {
+        } else if (ratio <= 100.00 ) {
             nRowBlocks = 256;
         } else {
             nRowBlocks = 512;
