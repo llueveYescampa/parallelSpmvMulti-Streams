@@ -1,6 +1,5 @@
-#include <math.h>
 
-void getRowsNnzPerStream(int *rowsPerSstream, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nRowBlocks)
+void getRowsNnzPerStream(int *rowsPerStream, const int *global_n, const int *global_nnz,  const int *row_Ptr, const int nRowBlocks)
 {
     double nnzIncre = (double) *global_nnz/ (double) nRowBlocks;
     double lookingFor=nnzIncre;
@@ -16,7 +15,7 @@ void getRowsNnzPerStream(int *rowsPerSstream, const int *global_n, const int *gl
                 endRow = row-1;
             } // end if //
             
-            rowsPerSstream[partition] = endRow-startRow+1;
+            rowsPerStream[partition] = endRow-startRow+1;
             //nnzPGPU[partition]  = row_Ptr[endRow+1] - row_Ptr[startRow];
              
             startRow = endRow+1;
