@@ -353,7 +353,13 @@ int main(int argc, char *argv[])
 */    
 
     for (int s=0; s<nStreams; ++s) {
-        printf("\tblock for stream %3d has size: [%3d, %3d] and %d rows.\n", s, block[s].x, block[s].y, starRowStream[s+1]-starRowStream[s]) ;
+        printf("\tblock for stream %3d has size: [%3d, %3d],  %10d rows and %12d non-zeros.\n", 
+                               s, 
+                               block[s].x, 
+                               block[s].y, 
+                               starRowStream[s+1]-starRowStream[s],
+                               row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]] );
+                               
     } // end for //
   
     // Timing should begin here//
