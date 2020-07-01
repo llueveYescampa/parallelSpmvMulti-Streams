@@ -13,20 +13,6 @@
 #define MAXTHREADS 256
 #define REP 1000
 
-struct str
-{
-    int value;
-    int index;
-};
-
-int cmp(const void *a, const void *b)
-{
-    struct str *a1 = (struct str *)a;
-    struct str *a2 = (struct str *)b;
-    
-    return ( (*a2).value - (*a1).value );
-} // end cmp() //
-
 void meanAndSd(real *mean, real *sd,real *data, int n)
 {
     real sum = (real) 0.0; 
@@ -107,7 +93,7 @@ int main(int argc, char *argv[])
         // determining number of streams based on mean and sd
         real ratio = tmpSD/tmpMean;
         //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
-
+        
         if        (ratio <= 0.220 ) {
             nRowBlocks = 1;
         } else if (ratio <= 0.275 ) {
@@ -136,7 +122,6 @@ int main(int argc, char *argv[])
     if (argc  > 4  && atoi(argv[4]) > 0) {
         nRowBlocks = atoi(argv[4]);
     } // end if //
-
     
     
     printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
@@ -303,7 +288,6 @@ int main(int argc, char *argv[])
     printf("%d Blocks produced %d streams\n", nRowBlocks, nStreams);
     grid  = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
     block = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
-    toSortStream= (struct str *) malloc(sizeof(struct str) * nStreams); 
     sharedMemorySize = (size_t *) calloc(nStreams, sizeof(size_t)); 
     stream= (cudaStream_t *) malloc(sizeof(cudaStream_t) * nStreams);
     
@@ -323,14 +307,12 @@ int main(int argc, char *argv[])
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
     } // end for //
 
-    toSortStream[0].value=block[0].x=blockSize[0];
-    toSortStream[0].index=0;
+    block[0].x=blockSize[0];
     starRowStream[0]=starRowBlock[0];
     starRowStream[nStreams]=starRowBlock[nRowBlocks];
     
     if (block[0].x > MAXTHREADS) {
-        toSortStream[0].value=block[0].x=512;
-        toSortStream[0].index=0;
+        block[0].x=512;
         block[0].y=1;
     } else {
         block[0].y=MAXTHREADS/block[0].x;
@@ -340,11 +322,9 @@ int main(int argc, char *argv[])
 
     for (int b=1, s=1; b<nRowBlocks; ++b) {
         if (blockSize[b] != blockSize[b-1]) {
-            toSortStream[s].value=block[s].x=blockSize[b];
-            toSortStream[s].index=s;
+            block[s].x=blockSize[b];
             if (block[s].x > MAXTHREADS) {
-                toSortStream[s].value=block[s].x=512;
-                toSortStream[s].index=s;
+                block[s].x=512;
                 block[s].y=1;
             } else {
                 block[s].y=MAXTHREADS/block[s].x;
@@ -372,16 +352,16 @@ int main(int argc, char *argv[])
     //exit(0);    
 */    
 
-    qsort(toSortStream, nStreams, sizeof(toSortStream[0]), cmp);
     for (int s=0; s<nStreams; ++s) {
-        //printf("\tblock for stream %3d has size: [%3d, %3d]\n", s, block[s].x, block[s].y) ;
-        int ss = toSortStream[s].index;
-        printf("\tblock for stream %3d has size: [%3d, %3d] and %d rows.\n", ss, block[ss].x, block[ss].y, starRowStream[ss+1]-starRowStream[ss]) ;
+        printf("\tblock for stream %3d has size: [%3d, %3d],  %10d rows and %12d non-zeros.\n", 
+                               s, 
+                               block[s].x, 
+                               block[s].y, 
+                               starRowStream[s+1]-starRowStream[s],
+                               row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]] );
     } // end for //
   
-  
     // Timing should begin here//
-    
 
     struct timeval tp;                                   // timer
     double elapsed_time;
@@ -392,8 +372,7 @@ int main(int argc, char *argv[])
         //cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(real) );
         //if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
         
-        for (int ss=0; ss<nStreams; ++ss) {
-            int s = toSortStream[ss].index;
+        for (int s=0; s<nStreams; ++s) {
             const int sRow = starRowStream[s];
             const int nrows = starRowStream[s+1]-starRowStream[s];
 #ifdef USE_TEXTURE
