@@ -24,7 +24,7 @@ int cmp(const void *a, const void *b)
     struct str *a1 = (struct str *)a;
     struct str *a2 = (struct str *)b;
     
-    return ( (*a1).value - (*a1).value );
+    return ( (*a2).value - (*a1).value );
 } // end cmp() //
 
 void meanAndSd(real *mean, real *sd,real *data, int n)
