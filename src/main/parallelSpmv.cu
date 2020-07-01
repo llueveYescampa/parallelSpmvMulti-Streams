@@ -359,7 +359,6 @@ int main(int argc, char *argv[])
                                block[s].y, 
                                starRowStream[s+1]-starRowStream[s],
                                row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]] );
-                               
     } // end for //
   
     // Timing should begin here//
