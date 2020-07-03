@@ -303,7 +303,6 @@ int main(int argc, char *argv[])
     printf("%d Blocks produced %d streams\n", nRowBlocks, nStreams);
     grid  = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
     block = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
-    toSortStream= (struct str *) malloc(sizeof(struct str) * nStreams); 
     sharedMemorySize = (size_t *) calloc(nStreams, sizeof(size_t)); 
     stream= (cudaStream_t *) malloc(sizeof(cudaStream_t) * nStreams);
     
@@ -323,14 +322,12 @@ int main(int argc, char *argv[])
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
     } // end for //
 
-    toSortStream[0].value=block[0].x=blockSize[0];
-    toSortStream[0].index=0;
+    block[0].x=blockSize[0];
     starRowStream[0]=starRowBlock[0];
     starRowStream[nStreams]=starRowBlock[nRowBlocks];
     
     if (block[0].x > MAXTHREADS) {
-        toSortStream[0].value=block[0].x=512;
-        toSortStream[0].index=0;
+        block[0].x=512;
         block[0].y=1;
     } else {
         block[0].y=MAXTHREADS/block[0].x;
@@ -340,11 +337,9 @@ int main(int argc, char *argv[])
 
     for (int b=1, s=1; b<nRowBlocks; ++b) {
         if (blockSize[b] != blockSize[b-1]) {
-            toSortStream[s].value=block[s].x=blockSize[b];
-            toSortStream[s].index=s;
+            block[s].x=blockSize[b];
             if (block[s].x > MAXTHREADS) {
-                toSortStream[s].value=block[s].x=512;
-                toSortStream[s].index=s;
+                block[s].x=512;
                 block[s].y=1;
             } else {
                 block[s].y=MAXTHREADS/block[s].x;
@@ -372,7 +367,25 @@ int main(int argc, char *argv[])
     //exit(0);    
 */    
 
+
+// sorting before execution by block size or nonzeros
+    toSortStream= (struct str *) malloc(sizeof(struct str) * nStreams); 
+    for (int s=0; s<nStreams; ++s) {
+        toSortStream[s].index = s;
+    
+        
+        // sorting by block size
+        toSortStream[s].value=block[s].x;
+        
+        
+        // sorting by non-zeros size
+        //toSortStream[s].value = row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]];
+        
+    } // end for //
     qsort(toSortStream, nStreams, sizeof(toSortStream[0]), cmp);
+// end of sorting before execution by block size or nonzeros
+    
+    
     for (int s=0; s<nStreams; ++s) {
         //printf("\tblock for stream %3d has size: [%3d, %3d]\n", s, block[s].x, block[s].y) ;
         int ss = toSortStream[s].index;
