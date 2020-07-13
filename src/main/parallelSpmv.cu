@@ -93,12 +93,12 @@ int main(int argc, char *argv[])
         // determining number of streams based on mean and sd
         real ratio = tmpSD/tmpMean;
         //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
-        if        (ratio <= 0.150 ) {
+        if        (ratio <= 0.173 ) {
             nRowBlocks = 1;
-        } else if (ratio <= 1.0 ) {
-            nRowBlocks = round(29.808*ratio - 3.900);
+        } else if (ratio <= 3.5 ) {
+            nRowBlocks = round(8.66 * ratio - 0.5);
         } else {
-            nRowBlocks = round(58.4400*log(ratio)+ 6.5949);
+            nRowBlocks = round(58.87 * log(ratio) - 43.92);
         } // end if //
         /*
         if        (ratio <= 0.220 ) {
