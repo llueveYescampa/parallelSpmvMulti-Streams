@@ -8,7 +8,7 @@ void getRowsNnzPerStream(int *rowsPerSet, const int *global_n, const int *global
     int reducedBlockSize= nRowBlocks;
     int reducedNnz=*global_nnz;
     int nnzLimit = rows[lowRow] + SIZE(0,reducedBlockSize, reducedNnz);
-    int partition=0;    
+    int partition=1;    
 
     for (int row = 0; row<*global_n; ++row) {
         if ( rows[row+1] >=  nnzLimit ) { 
@@ -21,11 +21,16 @@ void getRowsNnzPerStream(int *rowsPerSet, const int *global_n, const int *global
             reducedNnz -=  (rows[upRow+1]-rows[lowRow]);
             --reducedBlockSize;
             lowRow=upRow+1;
-            if (partition < nRowBlocks-1 ) nnzLimit= rows[lowRow] + SIZE(0,reducedBlockSize, reducedNnz);
+            if (partition < nRowBlocks ) nnzLimit= rows[lowRow] + SIZE(0,reducedBlockSize, reducedNnz);
             ++partition;
         } // end if // 
         
     } // end for //
+    
+    for(int s=0; s<nRowBlocks; ++s) {
+        rowsPerSet[s+1] += rowsPerSet[s];
+    } // end for //
+    
 } // end of getRowsPerProc //
 
 /*

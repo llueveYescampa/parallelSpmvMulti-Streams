@@ -76,7 +76,10 @@ int main(int argc, char *argv[])
         printf("Quitting.....\n");
         exit(0);
     } // end if //
-
+    
+    // reading basic matrix data
+    reader(&n_global,&nnz_global, &row_ptr,&col_idx,&val,argv[1]);
+    // end of reading basic matrix data
 
     
     { // determining the number of block rows based on mean and sd of the nnz 
@@ -134,13 +137,7 @@ int main(int argc, char *argv[])
     
     printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
     
-    starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
-    starRowBlock[0]=0;
-    
-    
-    reader(&n_global,&nnz_global, starRowBlock, 
-           &row_ptr,&col_idx,&val,
-           argv[1], &nRowBlocks);
+
            
     //printf("file: %s, line: %d, n_global: %d, nnz_global: %d, nRowBlocks: %d\n", __FILE__, __LINE__,n_global, nnz_global, nRowBlocks  ); exit(0);
         
@@ -230,13 +227,16 @@ int main(int argc, char *argv[])
 
 
 
+    starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
+    starRowBlock[0]=0;
+           
+    if (nRowBlocks > n_global) nRowBlocks = n_global;
+    getRowsNnzPerStream(starRowBlock,&n_global,&nnz_global, row_ptr, nRowBlocks);
 
     blockSize= (int *) malloc(sizeof(int) * nRowBlocks); 
     for (int b=0; b<nRowBlocks; ++b) {
         blockSize[b] = 1;
     } // end for //
-
-
 
     for (int b=0; b<nRowBlocks; ++b) {
         int nrows = starRowBlock[b+1]-starRowBlock[b];

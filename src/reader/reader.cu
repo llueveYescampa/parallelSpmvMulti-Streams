@@ -3,14 +3,11 @@
 
 #include "real.h"
 
-void getRowsNnzPerStream(int *rowsPS, const int *global_n, const int *global_nnz, const int *row_Ptr, const int nRowBlocks);
 
 void reader( int *n_global, 
              int *nnz_global, 
-             int *rowsPS,
              int **rowPtr, int **colIdx, real **val,
-             const char *matrixFile,
-             int *nRowBlocks
+             const char *matrixFile
              )
 {
     
@@ -30,9 +27,6 @@ void reader( int *n_global,
     // reading rows vector (n+1) values //
     if ( !fread(*rowPtr, sizeof(int), (size_t) (*n_global+1), filePtr)) exit(0);
 
-    if (*nRowBlocks > *n_global) *nRowBlocks = *n_global;
-    
-    getRowsNnzPerStream((rowsPS+1),n_global,nnz_global, *rowPtr, *nRowBlocks);
 
     (*colIdx) = (int *)  malloc( (*nnz_global) * sizeof(int)); 
     // reading colIdx vector (nnz) values //
@@ -51,10 +45,7 @@ void reader( int *n_global,
         } // end for //    
         free(temp);
     } // end if //
-    
-    for(int s=0; s<*nRowBlocks; ++s) {
-        rowsPS[s+1] += rowsPS[s];
-    } // end for //
+
     
     fclose(filePtr);
 } // end of reader //
