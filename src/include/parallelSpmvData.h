@@ -26,8 +26,8 @@
     
     cudaStream_t *stream = NULL;
     
-    real *meanNnzPerRow=NULL;
-    real *sd=NULL;
+    real meanNnzPerRow=0;
+    real sd=0;
     
     dim3 *block=NULL;
     dim3 *grid=NULL;

@@ -230,8 +230,6 @@ int main(int argc, char *argv[])
 
 
 
-    meanNnzPerRow = (real*) malloc(nRowBlocks*sizeof(real));
-    sd            = (real*) malloc(nRowBlocks*sizeof(real ));
 
     blockSize= (int *) malloc(sizeof(int) * nRowBlocks); 
     for (int b=0; b<nRowBlocks; ++b) {
@@ -249,13 +247,13 @@ int main(int argc, char *argv[])
         for (int row=starRowBlock[b], i=0; row<starRowBlock[b]+nrows; ++row, ++i) {
             temp[i] = row_ptr[row+1] - row_ptr[row];
         } // end for //
-        meanAndSd(&meanNnzPerRow[b],&sd[b],temp, nrows);
+        meanAndSd(&meanNnzPerRow,&sd,temp, nrows);
         //printf("file: %s, line: %d, gpu on-prcoc:   %d, mean: %7.3f, sd: %7.3f using: %s\n", __FILE__, __LINE__, s , meanNnzPerRow[s], sd[s], (meanNnzPerRow[s] + 0.5*sd[s] < 32) ? "spmv0": "spmv1" );
         free(temp);
         /////////////////////////////////////////////////////
 
         // these mean use vector spmv 
-        real limit=meanNnzPerRow[b] + parameter2Adjust*sd[b];
+        real limit=meanNnzPerRow + parameter2Adjust*sd;
         if ( limit < 4.5  ) {
             blockSize[b]=warpSize/32;
         }  else if (limit < 6.95 ) {

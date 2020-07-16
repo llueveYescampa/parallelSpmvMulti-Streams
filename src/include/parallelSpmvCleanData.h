@@ -17,8 +17,8 @@
     
     free(stream);
     
-    free(meanNnzPerRow);
-    free(sd);
+    //free(meanNnzPerRow);
+    //free(sd);
     free(sharedMemorySize);
     free(block);
     free(grid);
