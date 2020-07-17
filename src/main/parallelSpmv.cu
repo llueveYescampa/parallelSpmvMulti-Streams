@@ -133,11 +133,9 @@ int main(int argc, char *argv[])
     if (argc  > 4  && atoi(argv[4]) > 0) {
         nRowBlocks = atoi(argv[4]);
     } // end if //
-    
+    if (nRowBlocks > n_global) nRowBlocks = n_global;
     
     printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
-    
-
            
     //printf("file: %s, line: %d, n_global: %d, nnz_global: %d, nRowBlocks: %d\n", __FILE__, __LINE__,n_global, nnz_global, nRowBlocks  ); exit(0);
         
@@ -230,7 +228,6 @@ int main(int argc, char *argv[])
     starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
     starRowBlock[0]=0;
            
-    if (nRowBlocks > n_global) nRowBlocks = n_global;
     getRowsNnzPerStream(starRowBlock,&n_global,&nnz_global, row_ptr, nRowBlocks);
 
     blockSize= (int *) malloc(sizeof(int) * nRowBlocks); 
