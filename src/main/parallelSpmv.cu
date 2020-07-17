@@ -225,16 +225,14 @@ int main(int argc, char *argv[])
     //printf("file: %s, line: %d, n_global: %d, nnz_global: %d, nRowBlocks: %d\n", __FILE__, __LINE__,n_global, nnz_global, nRowBlocks  ); exit(0);
 
 
-
-    starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
-    starRowBlock[0]=0;
-           
-    getRowsNnzPerStream(starRowBlock,&n_global,&nnz_global, row_ptr, nRowBlocks);
-
     blockSize= (int *) malloc(sizeof(int) * nRowBlocks); 
     for (int b=0; b<nRowBlocks; ++b) {
         blockSize[b] = 1;
     } // end for //
+
+    starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
+    starRowBlock[0]=0;
+    getRowsNnzPerStream(starRowBlock,&n_global,&nnz_global, row_ptr, nRowBlocks);
 
     for (int b=0; b<nRowBlocks; ++b) {
         int nrows = starRowBlock[b+1]-starRowBlock[b];
