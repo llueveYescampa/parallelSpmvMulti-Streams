@@ -81,63 +81,6 @@ int main(int argc, char *argv[])
     reader(&n_global,&nnz_global, &row_ptr,&col_idx,&val,argv[1]);
     // end of reading basic matrix data
 
-    
-    { // determining the number of block rows based on mean and sd of the nnz 
-        // opening matrix file to read mean and sd of number of nonzeros per row
-        double tmpMean, tmpSD;
-        fh = fopen(argv[1], "rb");
-        // reading laast two values in file: mean and sd //
-        fseek(fh, 0L, SEEK_END);
-        long int offset = ftell(fh)-2*sizeof(double);
-        fseek(fh, offset, SEEK_SET);
-        if ( !fread(&tmpMean, sizeof(double), (size_t) 1, fh)) exit(0);
-        if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
-        
-        // determining number of streams based on mean and sd
-        real ratio = tmpSD/tmpMean;
-        //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
-        if        (ratio <= 0.173 ) {
-            nRowBlocks = 1;
-        } else if (ratio <= 3.5 ) {
-            nRowBlocks = round(8.66 * ratio - 0.5);
-        } else {
-            nRowBlocks = round(58.87 * log(ratio) - 43.92);
-        } // end if //
-        /*
-        if        (ratio <= 0.220 ) {
-            nRowBlocks = 1;
-        } else if (ratio <= 0.275 ) {
-            nRowBlocks = 2;
-        } else if (ratio <= 0.420 ) {
-            nRowBlocks = 4;
-        } else if (ratio <= 0.65 ) {
-            nRowBlocks = 8;
-        } else if (ratio <= 0.75 ) {
-            nRowBlocks = 16;
-        } else if (ratio <= 2.20 ) {
-            nRowBlocks = 32;
-        } else if (ratio <= 8.20 ) {
-            nRowBlocks = 64;
-        } else if (ratio <= 60.00 ) {
-            nRowBlocks = 128;
-        } else if (ratio <= 120.00 ) {
-            nRowBlocks = 256;
-        } else {
-            nRowBlocks = 512;
-        } // end if //
-        */
-        printf("nRowBlocks: %d\n", nRowBlocks);
-    } // end of determining the number of block rows based on mean and sd of the nnz 
-    if (fh) fclose(fh);
-    // the value of  nRowBlocks can be forced by run-time paramenter   
-    if (argc  > 4  && atoi(argv[4]) > 0) {
-        nRowBlocks = atoi(argv[4]);
-    } // end if //
-    if (nRowBlocks > n_global) nRowBlocks = n_global;
-    
-    printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
-           
-    //printf("file: %s, line: %d, n_global: %d, nnz_global: %d, nRowBlocks: %d\n", __FILE__, __LINE__,n_global, nnz_global, nRowBlocks  ); exit(0);
         
     // ready to start //    
     cudaError_t cuda_ret;
@@ -222,6 +165,64 @@ int main(int argc, char *argv[])
 */    
 #endif
     //cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+
+    
+    { // determining the number of block rows based on mean and sd of the nnz 
+        // opening matrix file to read mean and sd of number of nonzeros per row
+        double tmpMean, tmpSD;
+        fh = fopen(argv[1], "rb");
+        // reading laast two values in file: mean and sd //
+        fseek(fh, 0L, SEEK_END);
+        long int offset = ftell(fh)-2*sizeof(double);
+        fseek(fh, offset, SEEK_SET);
+        if ( !fread(&tmpMean, sizeof(double), (size_t) 1, fh)) exit(0);
+        if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
+        if (fh) fclose(fh);
+        
+        // determining number of streams based on mean and sd
+        real ratio = tmpSD/tmpMean;
+        //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
+        if        (ratio <= 0.173 ) {
+            nRowBlocks = 1;
+        } else if (ratio <= 3.5 ) {
+            nRowBlocks = round(8.66 * ratio - 0.5);
+        } else {
+            nRowBlocks = round(58.87 * log(ratio) - 43.92);
+        } // end if //
+        /*
+        if        (ratio <= 0.220 ) {
+            nRowBlocks = 1;
+        } else if (ratio <= 0.275 ) {
+            nRowBlocks = 2;
+        } else if (ratio <= 0.420 ) {
+            nRowBlocks = 4;
+        } else if (ratio <= 0.65 ) {
+            nRowBlocks = 8;
+        } else if (ratio <= 0.75 ) {
+            nRowBlocks = 16;
+        } else if (ratio <= 2.20 ) {
+            nRowBlocks = 32;
+        } else if (ratio <= 8.20 ) {
+            nRowBlocks = 64;
+        } else if (ratio <= 60.00 ) {
+            nRowBlocks = 128;
+        } else if (ratio <= 120.00 ) {
+            nRowBlocks = 256;
+        } else {
+            nRowBlocks = 512;
+        } // end if //
+        */
+        printf("nRowBlocks: %d\n", nRowBlocks);
+    } // end of determining the number of block rows based on mean and sd of the nnz 
+    // the value of  nRowBlocks can be forced by run-time paramenter   
+    if (argc  > 4  && atoi(argv[4]) > 0) {
+        nRowBlocks = atoi(argv[4]);
+    } // end if //
+    if (nRowBlocks > n_global) nRowBlocks = n_global;
+    
+    printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
+           
+    //printf("file: %s, line: %d, n_global: %d, nnz_global: %d, nRowBlocks: %d\n", __FILE__, __LINE__,n_global, nnz_global, nRowBlocks  ); exit(0);
 
 
 
