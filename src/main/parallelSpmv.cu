@@ -80,7 +80,6 @@ int main(int argc, char *argv[])
     // reading basic matrix data
     reader(&n_global,&nnz_global, &row_ptr,&col_idx,&val,argv[1]);
     // end of reading basic matrix data
-
         
     // ready to start //    
     cudaError_t cuda_ret;
@@ -130,8 +129,6 @@ int main(int argc, char *argv[])
     cuda_ret = cudaMemcpy(v_d, v, (n_global)*sizeof(real),cudaMemcpyHostToDevice);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix x_d");
 
-
-
 #ifdef USE_TEXTURE
 
     cudaTextureDesc td;
@@ -157,7 +154,6 @@ int main(int argc, char *argv[])
     cudaTextureObject_t v_t;
     cuda_ret = cudaCreateTextureObject(&v_t, &resDesc, &td, NULL);
     if(cuda_ret != cudaSuccess) FATAL("Unable to create text memory v_t");
-
     
 /*
     cuda_ret = cudaBindTexture(NULL, v_t, v_d, n_global*sizeof(real));
@@ -166,7 +162,7 @@ int main(int argc, char *argv[])
 #endif
     //cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
-    
+////////////////// search for the  number of block of rows  ///////////////////////
     { // determining the number of block rows based on mean and sd of the nnz 
         // opening matrix file to read mean and sd of number of nonzeros per row
         double tmpMean, tmpSD;
@@ -219,6 +215,8 @@ int main(int argc, char *argv[])
         nRowBlocks = atoi(argv[4]);
     } // end if //
     if (nRowBlocks > n_global) nRowBlocks = n_global;
+////////////////// end of search for the  number of block of rows  /////////////////////////
+///////// see at the end of this file for a different but more expensive way of doing it ///
     
     printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
            
@@ -438,3 +436,70 @@ int main(int argc, char *argv[])
     #include "parallelSpmvCleanData.h" 
     return 0;    
 } // end main() //
+
+/*
+    int searchLimit=1;
+    { // determining the search limit  mean and sd of the nnz 
+        // opening matrix file to read mean and sd of number of nonzeros per row
+        double tmpMean, tmpSD;
+        fh = fopen(argv[1], "rb");
+        // reading laast two values in file: mean and sd //
+        fseek(fh, 0L, SEEK_END);
+        long int offset = ftell(fh)-2*sizeof(double);
+        fseek(fh, offset, SEEK_SET);
+        if ( !fread(&tmpMean, sizeof(double), (size_t) 1, fh)) exit(0);
+        if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
+        if (fh) fclose(fh);
+        // determining number of streams based on mean and sd
+        double ratio = tmpSD/tmpMean;
+        if        (ratio <= 0.2 ) {
+            searchLimit = 8;
+        } else if (ratio <= 60.0 ) {
+            searchLimit = 128;
+        } else if (ratio <= 120.0 ) {
+            searchLimit = 256;
+        } else {
+            searchLimit = 512;
+        } // end if //
+        //printf("searchLimit: %d\n", searchLimit);
+    } // end of determining the search limit  mean and sd of the nnz 
+    if (searchLimit > n_global) searchLimit=n_global;
+
+
+    // the value of  nRowBlocks can be forced by run-time paramenter   
+    if (argc  > 4  && atoi(argv[4]) > 0) {
+        nRowBlocks = atoi(argv[4]);
+    } else { // determining the optimal number of rows blocks based on the minimun
+       // average ratio sd of the nnz to its mean
+       double minAverage=1.0e38;
+        for (int nRowBlock=1; nRowBlock<=searchLimit; ++nRowBlock) {
+            
+            starRowBlock= (int *) malloc(sizeof(int) * nRowBlock+1); 
+            starRowBlock[0]=0;
+            getRowsNnzPerStream(starRowBlock, &n_global, &nnz_global, row_ptr, nRowBlock);
+            
+            real average = 0.0;
+            for (int b=0; b<nRowBlock; ++b) {
+                int nrows = starRowBlock[b+1]-starRowBlock[b];
+                /////////////////////////////////////////////////////
+                // determining the standard deviation of the nnz per row
+                real *temp=(real *) calloc(nrows,sizeof(real));
+                
+                for (int row=starRowBlock[b], i=0; row<starRowBlock[b]+nrows; ++row, ++i) {
+                    temp[i] = row_ptr[row+1] - row_ptr[row];
+                } // end for //
+                meanAndSd(&meanNnzPerRow,&sd,temp, nrows);
+                free(temp);
+                average+= sd/meanNnzPerRow;   
+                //printf("\t\tmean: %7.3f, sd: %7.3f ratio: %7.3f\n",  meanNnzPerRow, sd,sd/meanNnzPerRow  );
+            } // end for //
+            //printf("file: %s, line: %d, nRowBlock: %d, Average ratio: %7.3f\n", __FILE__, __LINE__,nRowBlock , average/nRowBlock );
+            if (average/nRowBlock < minAverage) {
+                minAverage=average/nRowBlock;
+                nRowBlocks=nRowBlock;
+            } // end if //
+        } // end for //
+        printf("nRowBlocks: %d , Average ratio: %7.3f\n",nRowBlocks, minAverage );
+        // end of determining optimal number of rows blocks      
+    } // end if //
+*/
