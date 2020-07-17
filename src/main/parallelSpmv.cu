@@ -91,6 +91,10 @@ int main(int argc, char *argv[])
         exit(0);
     } // end if //
 
+    // reading basic matrix data
+    reader(&n_global,&nnz_global, &row_ptr,&col_idx,&val,argv[1]);
+    // end of reading basic matrix data
+
 
     
     { // determining the number of block rows based on mean and sd of the nnz 
@@ -144,18 +148,13 @@ int main(int argc, char *argv[])
     if (argc  > 4  && atoi(argv[4]) > 0) {
         nRowBlocks = atoi(argv[4]);
     } // end if //
+    if (nRowBlocks > n_global) nRowBlocks = n_global;
 
-    
-    
     printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
     
-    starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
-    starRowBlock[0]=0;
     
-    
-    reader(&n_global,&nnz_global, starRowBlock, 
-           &row_ptr,&col_idx,&val,
-           argv[1], &nRowBlocks);
+
+
            
     //printf("file: %s, line: %d, n_global: %d, nnz_global: %d, nRowBlocks: %d\n", __FILE__, __LINE__,n_global, nnz_global, nRowBlocks  ); exit(0);
         
@@ -244,15 +243,14 @@ int main(int argc, char *argv[])
     //cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
 
-
-    meanNnzPerRow = (real*) malloc(nRowBlocks*sizeof(real));
-    sd            = (real*) malloc(nRowBlocks*sizeof(real ));
-
     blockSize= (int *) malloc(sizeof(int) * nRowBlocks); 
     for (int b=0; b<nRowBlocks; ++b) {
         blockSize[b] = 1;
     } // end for //
 
+    starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
+    starRowBlock[0]=0;
+    getRowsNnzPerStream(starRowBlock,&n_global,&nnz_global, row_ptr, nRowBlocks);
 
 
     for (int b=0; b<nRowBlocks; ++b) {
@@ -264,13 +262,13 @@ int main(int argc, char *argv[])
         for (int row=starRowBlock[b], i=0; row<starRowBlock[b]+nrows; ++row, ++i) {
             temp[i] = row_ptr[row+1] - row_ptr[row];
         } // end for //
-        meanAndSd(&meanNnzPerRow[b],&sd[b],temp, nrows);
+        meanAndSd(&meanNnzPerRow,&sd,temp, nrows);
         //printf("file: %s, line: %d, gpu on-prcoc:   %d, mean: %7.3f, sd: %7.3f using: %s\n", __FILE__, __LINE__, s , meanNnzPerRow[s], sd[s], (meanNnzPerRow[s] + 0.5*sd[s] < 32) ? "spmv0": "spmv1" );
         free(temp);
         /////////////////////////////////////////////////////
 
         // these mean use vector spmv 
-        real limit=meanNnzPerRow[b] + parameter2Adjust*sd[b];
+        real limit=meanNnzPerRow + parameter2Adjust*sd;
         if ( limit < 4.5  ) {
             blockSize[b]=warpSize/32;
         }  else if (limit < 6.95 ) {
