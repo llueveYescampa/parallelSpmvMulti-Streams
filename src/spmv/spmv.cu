@@ -3,29 +3,25 @@
 #include "parallelSpmv.h"
 
 #ifdef DOUBLE
-    extern texture<int2> xTex;
-    //extern texture<int2> valTex;
-#else
-    extern texture<float> xTex;
-    //extern texture<float> valTex;
-#endif
-
-#ifdef DOUBLE
     static __inline__ __device__ 
-    double fetch_real(texture<int2> t, int i)
+    double fetch_real(cudaTextureObject_t texObject, int i)
     {
-	    int2 v = tex1Dfetch(t,i);
-	    return __hiloint2double(v.y, v.x);
+        int2 v = tex1Dfetch<int2>(texObject,i);
+        return __hiloint2double(v.y, v.x);
     } // end of fetch_real() //
 #else
     static __inline__ __device__ 
-    float fetch_real(texture<float> t, int i)
+    //float fetch_real(texture<float> t, int i)
+    float fetch_real(cudaTextureObject_t texObject, int i)
     {
-	    return tex1Dfetch(t,i);
+        return tex1Dfetch<float>(texObject,i);
     } // end of fetch_double() //
 #endif
+
+
 __global__ 
 void ipcsr  (real *__restrict__ const y, 
+             cudaTextureObject_t    xTex, 
              const real *__restrict__ const val, 
              const int  *__restrict__ const col_idx, 
              const int  *__restrict__ const row_Ptr,

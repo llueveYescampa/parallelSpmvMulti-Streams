@@ -12,7 +12,7 @@
     } while(0)
 
 #define REP 1000
-
+/*
 #ifdef DOUBLE
     texture<int2>  xTex;
     //texture<int2>  valTex;
@@ -20,6 +20,7 @@
     texture<float> xTex;
     //texture<float> valTex;
 #endif
+*/
 
 int main(int argc, char *argv[]) 
 {
@@ -203,6 +204,33 @@ int main(int argc, char *argv[])
     cuda_ret = cudaMemcpy(v_d, v, (n_global)*sizeof(real),cudaMemcpyHostToDevice);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix x_d");
 
+    // texture object definition
+    cudaTextureDesc td;
+    memset(&td, 0, sizeof(td));
+    td.normalizedCoords = 0;
+    td.addressMode[0] = cudaAddressModeClamp;
+    td.readMode = cudaReadModeElementType;
+
+
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeLinear;
+    resDesc.res.linear.devPtr = v_d;
+    resDesc.res.linear.sizeInBytes = n_global*sizeof(real);
+    #ifdef DOUBLE
+    resDesc.res.linear.desc.f = cudaChannelFormatKindUnsigned;
+    resDesc.res.linear.desc.y = 32;
+    #else
+    resDesc.res.linear.desc.f = cudaChannelFormatKindFloat;
+    #endif
+    resDesc.res.linear.desc.x = 32;
+
+    cudaTextureObject_t v_t;
+    cuda_ret = cudaCreateTextureObject(&v_t, &resDesc, &td, NULL);
+    if(cuda_ret != cudaSuccess) FATAL("Unable to create text memory v_t");
+    // end of texture object definition
+
+
 
     block.x=MAXTHREADS;
     block.y = 1;
@@ -215,8 +243,6 @@ int main(int argc, char *argv[])
     printf("using ipcsr() spmv for on matrix,  blockSize: [%d, %d]\n",block.x,block.y  ) ;
 
     // Timing should begin here//
-    cuda_ret = cudaBindTexture(NULL, xTex, v_d, n_global*sizeof(real));
-    //cuda_ret = cudaBindTexture(NULL, valTex, vals_d, nnz_global*sizeof(real));            
 
     struct timeval tp;                                   // timer
     double elapsed_time;
@@ -225,7 +251,7 @@ int main(int argc, char *argv[])
     for (int t=0; t<REP; ++t) {
 
         //alg1<<<grid, block >>>(temp,vals_d,cols_d,nnz_global);
-        ipcsr<<<grid, block >>>(w_d , vals_d,cols_d, rows_d,blockRows_d,wtpb_d, sizeBlockRows, 1.0, 0.0 );
+        ipcsr<<<grid, block >>>(w_d , v_t, vals_d,cols_d, rows_d,blockRows_d,wtpb_d, sizeBlockRows, 1.0, 0.0 );
         cudaStreamSynchronize(NULL);
         
     } // end for //    
@@ -234,8 +260,6 @@ int main(int argc, char *argv[])
     printf ("Total time was %f seconds, GFLOPS: %f, GBytes/s: %f\n", elapsed_time*1.0e-6, 
                                      (2.0*nnz_global+ 3.0*n_global)*REP*1.0e-3/elapsed_time,
                                      (nnz_global*(2*sizeof(real) + sizeof(int))+n_global*(sizeof(real)+sizeof(int)))*REP*1.0e-3/elapsed_time);
-    cuda_ret = cudaUnbindTexture(xTex);
-    //cuda_ret = cudaUnbindTexture(valTex);
 
     cuda_ret = cudaMemcpy(w, w_d, (n_global)*sizeof(real),cudaMemcpyDeviceToHost);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix y_d back to host");
@@ -272,6 +296,7 @@ int main(int argc, char *argv[])
     } // end if //
     free(w);
     free(v);
+    cudaDestroyTextureObject(v_t);
     
     #include "parallelSpmvCleanData.h" 
     return 0;    

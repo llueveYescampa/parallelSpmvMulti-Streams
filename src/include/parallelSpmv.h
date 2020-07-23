@@ -21,6 +21,7 @@ void alg1   (      real *__restrict__ const temp,
 
 __global__ 
 void ipcsr  (real *__restrict__ const y, 
+             cudaTextureObject_t    xTex, 
              const real *__restrict__ const val, 
              const int  *__restrict__ const col_idx, 
              const int  *__restrict__ const row_Ptr,
