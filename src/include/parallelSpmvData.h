@@ -1,12 +1,9 @@
-//# define DEFAULT_STREAMS 4
+# define DEFAULT_STREAMS 4
 //# define MAX_STREAMS 16
 
     int n_global,nnz_global;
-    int nStreams=1;
-    int nRowBlocks=1;
-    int *starRowStream = NULL;
-    int *starRowBlock = NULL;
-    int *blockSize = NULL;
+    int nStreams=DEFAULT_STREAMS;
+    int *starRow = NULL;
 
     const int warpSize = 32;
     const real parameter2Adjust = 0.15;

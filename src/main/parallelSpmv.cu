@@ -78,8 +78,9 @@ int main(int argc, char *argv[])
     } // end if //
 
 
-    
-    { // determining the number of block rows based on mean and sd of the nnz 
+    if (argc  > 4  && atoi(argv[4]) > 0) {
+        nStreams = atoi(argv[4]);
+    } else {    
         // opening matrix file to read mean and sd of number of nonzeros per row
         double tmpMean, tmpSD;
         fh = fopen(argv[1], "rb");
@@ -89,53 +90,32 @@ int main(int argc, char *argv[])
         fseek(fh, offset, SEEK_SET);
         if ( !fread(&tmpMean, sizeof(double), (size_t) 1, fh)) exit(0);
         if ( !fread(&tmpSD, sizeof(double), (size_t) 1, fh)) exit(0);
-        
         // determining number of streams based on mean and sd
         real ratio = tmpSD/tmpMean;
-        //printf("file: %s, line: %d, tMean nnz: %.2f, SD nnz: %.2f, ratio: %.2f\n", __FILE__, __LINE__ , tmpMean, tmpSD, ratio);
-        
-        if        (ratio <= 0.220 ) {
-            nRowBlocks = 1;
-        } else if (ratio <= 0.275 ) {
-            nRowBlocks = 2;
-        } else if (ratio <= 0.420 ) {
-            nRowBlocks = 4;
-        } else if (ratio <= 0.65 ) {
-            nRowBlocks = 8;
-        } else if (ratio <= 0.75 ) {
-            nRowBlocks = 16;
-        } else if (ratio <= 2.20 ) {
-            nRowBlocks = 32;
-        } else if (ratio <= 8.20 ) {
-            nRowBlocks = 64;
-        } else if (ratio <= 60.00 ) {
-            nRowBlocks = 128;
-        } else if (ratio <= 120.00 ) {
-            nRowBlocks = 256;
-        } else {
-            nRowBlocks = 512;
+        if (ratio < 0.5 && tmpSD < 60.0) {
+            nStreams = 1;
+            printf("nStreams: %d\n", nStreams);
+        } else if (tmpSD > 85.0) {
+            nStreams = 5;
+            printf("nStreams: %d\n", nStreams);
+        } else  {
+            nStreams = 4;
         } // end if //
-        printf("nRowBlocks: %d\n", nRowBlocks);
-    } // end of determining the number of block rows based on mean and sd of the nnz 
-    if (fh) fclose(fh);
-    // the value of  nRowBlocks can be forced by run-time paramenter   
-    if (argc  > 4  && atoi(argv[4]) > 0) {
-        nRowBlocks = atoi(argv[4]);
     } // end if //
+    if (fh) fclose(fh);
     
     
-    printf("%s Precision. Solving dividing matrix into %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nRowBlocks, (nRowBlocks > 1) ? "blocks": "block"  );
+    printf("%s Precision. Solving using %d %s\n", (sizeof(real) == sizeof(double)) ? "Double": "Single", nStreams, (nStreams > 1) ? "streams": "stream"  );
+
+    stream= (cudaStream_t *) malloc(sizeof(cudaStream_t) * nStreams);
     
-    starRowBlock= (int *) malloc(sizeof(int) * nRowBlocks+1); 
-    starRowBlock[0]=0;
-    
-    
-    reader(&n_global,&nnz_global, starRowBlock, 
+    starRow = (int *) malloc(sizeof(int) * nStreams+1); 
+    starRow[0]=0;
+    reader(&n_global,&nnz_global, starRow, 
            &row_ptr,&col_idx,&val,
-           argv[1], &nRowBlocks);
-           
-    //printf("file: %s, line: %d, n_global: %d, nnz_global: %d, nRowBlocks: %d\n", __FILE__, __LINE__,n_global, nnz_global, nRowBlocks  ); exit(0);
-        
+           argv[1], nStreams);
+    
+    
     // ready to start //    
     cudaError_t cuda_ret;
     
@@ -222,78 +202,12 @@ int main(int argc, char *argv[])
 
 
 
-    meanNnzPerRow = (real*) malloc(nRowBlocks*sizeof(real));
-    sd            = (real*) malloc(nRowBlocks*sizeof(real ));
-
-    blockSize= (int *) malloc(sizeof(int) * nRowBlocks); 
-    for (int b=0; b<nRowBlocks; ++b) {
-        blockSize[b] = 1;
-    } // end for //
-
-
-
-    for (int b=0; b<nRowBlocks; ++b) {
-        int nrows = starRowBlock[b+1]-starRowBlock[b];
-        /////////////////////////////////////////////////////
-        // determining the standard deviation of the nnz per row
-        real *temp=(real *) calloc(nrows,sizeof(real));
-        
-        for (int row=starRowBlock[b], i=0; row<starRowBlock[b]+nrows; ++row, ++i) {
-            temp[i] = row_ptr[row+1] - row_ptr[row];
-        } // end for //
-        meanAndSd(&meanNnzPerRow[b],&sd[b],temp, nrows);
-        //printf("file: %s, line: %d, gpu on-prcoc:   %d, mean: %7.3f, sd: %7.3f using: %s\n", __FILE__, __LINE__, s , meanNnzPerRow[s], sd[s], (meanNnzPerRow[s] + 0.5*sd[s] < 32) ? "spmv0": "spmv1" );
-        free(temp);
-        /////////////////////////////////////////////////////
-
-        // these mean use vector spmv 
-        real limit=meanNnzPerRow[b] + parameter2Adjust*sd[b];
-        if ( limit < 4.5  ) {
-            blockSize[b]=warpSize/32;
-        }  else if (limit < 6.95 ) {
-            blockSize[b]=warpSize/16;
-        }  else if (limit < 15.5 ) {
-            blockSize[b]=warpSize/8;
-        }  else if (limit < 74.0 ) {
-            blockSize[b]=warpSize/4;
-        }  else if (limit < 300.0 ) {
-            blockSize[b]=warpSize/2;
-        }  else if (limit < 350.0 ) {
-            blockSize[b]=warpSize;
-        }  else if (limit < 1000.0 ) {
-            blockSize[b]=warpSize*2;
-        }  else if (limit < 2000.0 ) {
-            blockSize[b]=warpSize*4;
-        }  else if (limit < 3000.0 ) {
-            blockSize[b]=warpSize*8;
-        }  else {
-            blockSize[b]=warpSize*16;
-        } // end if //
-        if (blockSize[b] > MAXTHREADS) {
-            blockSize[b]=512;
-        } // end if //    
-        //printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",blockSize[b],blockSize[b], meanNnzPerRow[b], sd[b]) ;
-    } // end for //
-    
-    
-    // here comes the consolidation ....
-    
-    nStreams=1;
-    for (int b=1; b<nRowBlocks; ++b) {
-        if (blockSize[b] != blockSize[b-1]) {
-            ++nStreams;
-        } // end if //
-    } // end for //
-    
-    printf("%d Blocks produced %d streams\n", nRowBlocks, nStreams);
-    grid  = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
+    meanNnzPerRow = (real*) malloc(nStreams*sizeof(real));
+    sd            = (real*) malloc(nStreams*sizeof(real ));
     block = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
+    grid  = (dim3 *) malloc(nStreams*sizeof(dim3 )); 
     sharedMemorySize = (size_t *) calloc(nStreams, sizeof(size_t)); 
-    stream= (cudaStream_t *) malloc(sizeof(cudaStream_t) * nStreams);
-    
-    starRowStream = (int *) malloc( (nStreams+1) * sizeof(int) ); 
-    
-    
+
     for (int s=0; s<nStreams; ++s) {
         block[s].x = 1;
         block[s].y = 1;
@@ -301,67 +215,94 @@ int main(int argc, char *argv[])
         grid[s].x = 1;
         grid[s].y = 1;
         grid[s].z = 1;
+    } // end for //
+
+    for (int s=0; s<nStreams; ++s) {
+        int nrows = starRow[s+1]-starRow[s];
+        /////////////////////////////////////////////////////
+        // determining the standard deviation of the nnz per row
+        real *temp=(real *) calloc(nrows,sizeof(real));
+        
+        for (int row=starRow[s], i=0; row<starRow[s]+nrows; ++row, ++i) {
+            temp[i] = row_ptr[row+1] - row_ptr[row];
+        } // end for //
+        meanAndSd(&meanNnzPerRow[s],&sd[s],temp, nrows);
+        //printf("file: %s, line: %d, gpu on-prcoc:   %d, mean: %7.3f, sd: %7.3f using: %s\n", __FILE__, __LINE__, s , meanNnzPerRow[s], sd[s], (meanNnzPerRow[s] + 0.5*sd[s] < 32) ? "spmv0": "spmv1" );
+        free(temp);
+        /////////////////////////////////////////////////////
 
         //cuda_ret = cudaStreamCreateWithFlags(&stream0[gpu], cudaStreamDefault);
         cuda_ret = cudaStreamCreateWithFlags(&stream[s], cudaStreamNonBlocking ) ;
         if(cuda_ret != cudaSuccess) FATAL("Unable to create stream0 ");
-    } // end for //
-
-    block[0].x=blockSize[0];
-    starRowStream[0]=starRowBlock[0];
-    starRowStream[nStreams]=starRowBlock[nRowBlocks];
-    
-    if (block[0].x > MAXTHREADS) {
-        block[0].x=512;
-        block[0].y=1;
-    } else {
-        block[0].y=MAXTHREADS/block[0].x;
-    } // end if //    
-    //printf("file: %s, line: %d, using vector spmv for on matrix,  blockSize: [%d, %d]\n", __FILE__, __LINE__, block[0].x,block[0].y) ;
-    
-
-    for (int b=1, s=1; b<nRowBlocks; ++b) {
-        if (blockSize[b] != blockSize[b-1]) {
-            block[s].x=blockSize[b];
-            if (block[s].x > MAXTHREADS) {
-                block[s].x=512;
-                block[s].y=1;
+        
+        printf("In Stream: %d\n",s);
+        
+/*        
+        if (meanNnzPerRow[s] < 10 && parameter2Adjust*sd[s] < warpSize) {
+        	// these mean use scalar spmv
+            if (meanNnzPerRow[s] < (real) 4.5) {
+                block[s].x=128;
+            } else if (meanNnzPerRow[s] < (real) 14.4) {
+                block[s].x=64;
             } else {
-                block[s].y=MAXTHREADS/block[s].x;
-            } // end if //    
-            
-            starRowStream[s]=starRowBlock[b];
-            //printf("file: %s, line: %d, using vector spmv for on matrix,  blockSize: [%d, %d] \n",  __FILE__, __LINE__,  block[s].x,block[s].y) ;
-        	
-            ++s;
+                block[s].x=32;
+            } // end if //
+            grid[s].x = (   (  nrows + block[s].x -1) /block[s].x );
+            printf("using scalar spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
+        } else {
+            // these mean use vector spmv 
+            if (meanNnzPerRow[s] > 10.0*warpSize) {
+                block[s].x=2*warpSize;
+            }  else if (meanNnzPerRow[s] > 4.0*warpSize) {
+                block[s].x=warpSize/2;
+            }  else {
+                block[s].x=warpSize/4;
+            } // end if //
+            block[s].y=MAXTHREADS/block[s].x;
+            grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
+        	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
+            printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
+        } // end if // 
+*/        
+
+        // these mean use vector spmv 
+        real limit=meanNnzPerRow[s] + parameter2Adjust*sd[s];
+        if ( limit < 4.5  ) {
+            block[s].x=warpSize/32;
+        }  else if (limit < 6.95 ) {
+            block[s].x=warpSize/16;
+        }  else if (limit < 15.5 ) {
+            block[s].x=warpSize/8;
+        }  else if (limit < 74.0 ) {
+            block[s].x=warpSize/4;
+        }  else if (limit < 300.0 ) {
+            block[s].x=warpSize/2;
+        }  else if (limit < 350.0 ) {
+            block[s].x=warpSize;
+        }  else if (limit < 1000.0 ) {
+            block[s].x=warpSize*2;
+        }  else if (limit < 2000.0 ) {
+            block[s].x=warpSize*4;
+        }  else if (limit < 3000.0 ) {
+            block[s].x=warpSize*8;
+        }  else {
+            block[s].x=warpSize*16;
         } // end if //
-    } // end for //
-
-    for (int s=0; s<nStreams; ++s) {
-        int nrows = starRowStream[s+1]-starRowStream[s];
-        //printf("file: %s, line: %d, using vector spmv for on matrix,  nrows: %d \n",  __FILE__, __LINE__, nrows ) ;
+        if (block[s].x > MAXTHREADS) {
+            block[s].x=512;
+            block[s].y=1;
+        } else {
+            block[s].y=MAXTHREADS/block[s].x;
+        } // end if //    
+        
         grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
-        sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
+    	sharedMemorySize[s]=block[s].x*block[s].y*sizeof(real);
+        printf("using vector spmv for on matrix,  blockSize: [%d, %d] %f, %f\n",block[s].x,block[s].y, meanNnzPerRow[s], sd[s]) ;
+
     } // end for //
 
-/*
-    for (int b=0; b<nRowBlocks; ++b) {
-        printf("blockSize: [%d] %d, %d\n",blockSize[b],  starRowBlock[b+1], starRowBlock[b]) ;
-    } // end for //
-    printf("\n\n");
-    //exit(0);    
-*/    
-
-    for (int s=0; s<nStreams; ++s) {
-        printf("\tblock for stream %3d has size: [%3d, %3d],  %10d rows and %12d non-zeros.\n", 
-                               s, 
-                               block[s].x, 
-                               block[s].y, 
-                               starRowStream[s+1]-starRowStream[s],
-                               row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]] );
-    } // end for //
-  
     // Timing should begin here//
+    
 
     struct timeval tp;                                   // timer
     double elapsed_time;
@@ -373,8 +314,8 @@ int main(int argc, char *argv[])
         //if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
         
         for (int s=0; s<nStreams; ++s) {
-            const int sRow = starRowStream[s];
-            const int nrows = starRowStream[s+1]-starRowStream[s];
+            const int sRow = starRow[s];
+            const int nrows = starRow[s+1]-starRow[s];
 #ifdef USE_TEXTURE
             spmv<<<grid[s], block[s], sharedMemorySize[s], stream[s] >>>((w_d+sRow), v_t, vals_d, (rows_d+sRow), (cols_d), nrows, 1.0,0.0);
 #else

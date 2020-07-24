@@ -1,6 +1,4 @@
-    free(starRowStream);
-    free(starRowBlock);
-    free(blockSize);
+    free(starRow);
     free(row_ptr);
     free(col_idx);
     free(val);
