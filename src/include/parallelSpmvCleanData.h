@@ -7,7 +7,10 @@
     cudaFree(rows_d);
 /////////////// end  de-allocating device memory //////////////////////////
     delete[] starRowStream;
-    delete[] sharedMemorySize;    
+    delete[] sharedMemorySize;   
+    for (int s=0; s<nStreams; ++s) {
+        cudaStreamDestroy(stream[s]);
+    } // end for /
     delete[] stream;
     delete[] grid;
     delete[] block;    
