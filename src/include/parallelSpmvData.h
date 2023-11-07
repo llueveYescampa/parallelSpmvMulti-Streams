@@ -1,36 +1,28 @@
-//# define DEFAULT_STREAMS 4
-//# define MAX_STREAMS 16
-
-    int n_global,nnz_global;
-    int nStreams=1;
-    int nRowBlocks=1;
-    int *starRowStream = NULL;
-    int *starRowBlock = NULL;
-    int *blockSize = NULL;
-
-    const int warpSize = 32;
-    const real parameter2Adjust = 0.15;
-
-    // data for the on_proc solution
-    int *row_ptr=NULL;
-    int *col_idx=NULL;
-    real *val=NULL;
-
-    int *rows_d, *cols_d;
-    real *vals_d;
-    real *v_d, *w_d;
-
-    // end of data for the on_proc solution
+    // begining of data for solution
     
+    unsigned int n_global,nnz_global;
+    unsigned int *row_ptr = nullptr;
+    unsigned int *col_idx = nullptr;
+    floatType *val = nullptr;
+    floatType *w = nullptr;
+    floatType *v = nullptr;
+    unsigned int nRowBlocks=1;    
+    floatType nnzPerRow, stdDev;
     
+    const unsigned int warpSize = 32;
+    const floatType parameter2Adjust = 0.15;
+    unsigned int nStreams;
     
-    cudaStream_t *stream = NULL;
+    cudaStream_t *stream = nullptr;
+    dim3 *block=nullptr; dim3 *grid=nullptr;
+    unsigned int *starRowStream = nullptr;    
     
-    real meanNnzPerRow=0;
-    real sd=0;
-    
-    dim3 *block=NULL;
-    dim3 *grid=NULL;
+    unsigned int *rows_d = nullptr;
+    unsigned int *cols_d = nullptr;
+    floatType *vals_d = nullptr;
+    floatType *v_d = nullptr;
+    floatType *w_d = nullptr;
 
-    size_t *sharedMemorySize=NULL;
+    size_t *sharedMemorySize=nullptr;
 
+    // end of data for solution

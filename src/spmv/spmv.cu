@@ -13,15 +13,15 @@
 */
     #ifdef DOUBLE
         static __inline__ __device__ 
-        double fetch_real(cudaTextureObject_t texObject, int i)
+        double fetch_floatType(cudaTextureObject_t texObject, int i)
         {
             int2 v = tex1Dfetch<int2>(texObject,i);
             return __hiloint2double(v.y, v.x);
-        } // end of fetch_real() //
+        } // end of fetch_floatType() //
     #else
         static __inline__ __device__ 
-        //float fetch_real(texture<float> t, int i)
-        float fetch_real(cudaTextureObject_t texObject, int i)
+        //float fetch_floatType(texture<float> t, int i)
+        float fetch_floatType(cudaTextureObject_t texObject, int i)
         {
 	        return tex1Dfetch<float>(texObject,i);
         } // end of fetch_double() //
@@ -29,7 +29,7 @@
 #endif
 
 template <const unsigned int bs>
-__device__ void warpReduce(volatile real * const temp1, const unsigned int sharedMemIndx)
+__device__ void warpReduce(volatile floatType * const temp1, const unsigned int sharedMemIndx)
 {
     // unrolling warp 
     if (bs >= 64) temp1[sharedMemIndx] += temp1[sharedMemIndx + 32];
@@ -42,38 +42,38 @@ __device__ void warpReduce(volatile real * const temp1, const unsigned int share
 
 __global__ 
 #ifdef USE_TEXTURE
-void spmv(       real *__restrict__       y,
+void spmv(       floatType *__restrict__       y,
                  cudaTextureObject_t    xTex, 
-           const real *__restrict__ const val, 
-           const int  *__restrict__ const row_ptr, 
-           const int  *__restrict__ const col_idx, 
-           const int nRows,
-           const real alpha,
-           const real beta
+           const floatType *__restrict__ const val, 
+           const unsigned int  *__restrict__ const row_ptr, 
+           const unsigned int  *__restrict__ const col_idx, 
+           const unsigned int nRows,
+           const floatType alpha,
+           const floatType beta
           )
 #else
-void spmv(       real *__restrict__       y, 
-           const real *__restrict__ const x, 
-           const real *__restrict__ const val, 
-           const int  *__restrict__ const row_ptr, 
-           const int  *__restrict__ const col_idx, 
-           const int nRows,
-           const real alpha,
-           const real beta
+void spmv(       floatType *__restrict__       y, 
+           const floatType *__restrict__ const x, 
+           const floatType *__restrict__ const val, 
+           const unsigned int  *__restrict__ const row_ptr, 
+           const unsigned int  *__restrict__ const col_idx, 
+           const unsigned int nRows,
+           const floatType alpha,
+           const floatType beta
           )
 #endif
 {   
-    extern __shared__ real temp[];
+    extern __shared__ floatType temp[];
     const int row = blockIdx.x*blockDim.y + threadIdx.y;
     const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
-    temp[sharedMemIndx] = static_cast<real>(0.0);
+    temp[sharedMemIndx] = static_cast<floatType>(0.0);
 
     if (row < nRows) {
         switch(blockDim.x) {
             case 1  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -87,7 +87,7 @@ void spmv(       real *__restrict__       y,
             case 2  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -102,7 +102,7 @@ void spmv(       real *__restrict__       y,
             case 4  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -117,7 +117,7 @@ void spmv(       real *__restrict__       y,
             case 8  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -132,7 +132,7 @@ void spmv(       real *__restrict__       y,
             case 16  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -147,7 +147,7 @@ void spmv(       real *__restrict__       y,
             case 32  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -162,7 +162,7 @@ void spmv(       real *__restrict__       y,
             case 64  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -178,7 +178,7 @@ void spmv(       real *__restrict__       y,
             case 128  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -195,7 +195,7 @@ void spmv(       real *__restrict__       y,
             case 256  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
@@ -213,7 +213,7 @@ void spmv(       real *__restrict__       y,
             case 512  :
                 for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
                     #ifdef USE_TEXTURE
-                    temp[sharedMemIndx] += (val[col] * fetch_real( xTex, col_idx[col]));
+                    temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
                     #else
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif

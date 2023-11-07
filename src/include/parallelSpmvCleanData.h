@@ -1,25 +1,18 @@
-    free(starRowStream);
-    free(starRowBlock);
-    free(blockSize);
-    free(row_ptr);
-    free(col_idx);
-    free(val);
-
-    cudaFree(rows_d);
-    cudaFree(cols_d);
-    cudaFree(vals_d);
-    cudaFree(v_d);
+    delete[] w;
+/////////////// begin  de-allocating device memory //////////////////////////    
     cudaFree(w_d);
-
-    for (int s=0; s<nStreams; ++s) {
-        cudaStreamDestroy(stream[s]);
-    } // end for /
-    
-    free(stream);
-    
-    //free(meanNnzPerRow);
-    //free(sd);
-    free(sharedMemorySize);
-    free(block);
-    free(grid);
+    cudaFree(v_d);
+    cudaFree(vals_d);
+    cudaFree(cols_d);
+    cudaFree(rows_d);
+/////////////// end  de-allocating device memory //////////////////////////
+    delete[] starRowStream;
+    delete[] sharedMemorySize;    
+    delete[] stream;
+    delete[] grid;
+    delete[] block;    
+    delete[] v;    
+    delete[] val;
+    delete[] col_idx;
+    delete[] row_ptr;
 

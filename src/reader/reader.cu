@@ -1,51 +1,64 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <fstream>
+#include <cmath>
+#include "floatType.h"
 
-#include "real.h"
+using std::ifstream;
+using std::ios;
 
-
-void reader( int *n_global, 
-             int *nnz_global, 
-             int **rowPtr, int **colIdx, real **val,
-             const char *matrixFile
+void reader( unsigned int &n_global, 
+             unsigned int &nnz_global, 
+             unsigned int **rowPtr, unsigned int **colIdx, floatType **val,
+             const char *const matrixFile
              )
-{
-    
-    
-    FILE *filePtr;
-    filePtr = fopen(matrixFile, "rb");
-    
+{   
+    ifstream inFile;
+    inFile.open(matrixFile, ios::in | ios::binary);
+
     // reading global nun rows //
-    if ( !fread(n_global, sizeof(int), 1, filePtr) ) exit(0); 
+    inFile.read((char *) &n_global, sizeof(unsigned int));
 
     // reading global nnz //
-    if ( !fread(nnz_global, sizeof(int), (size_t) 1, filePtr)) exit(0);
-
-    // reading rowPtr //
-    (*rowPtr) = (int *) malloc((*n_global+1)*sizeof(int));    
-    //(*rowPtr)[0] = 0;
-    // reading rows vector (n+1) values //
-    if ( !fread(*rowPtr, sizeof(int), (size_t) (*n_global+1), filePtr)) exit(0);
+    inFile.read((char *) &nnz_global, sizeof(unsigned int));
 
 
-    (*colIdx) = (int *)  malloc( (*nnz_global) * sizeof(int)); 
-    // reading colIdx vector (nnz) values //
-    if ( !fread(*colIdx, sizeof(int), (size_t) (*nnz_global), filePtr)) exit(0);
+    // allocating and reading rowPtr //    
+    (*rowPtr) = new unsigned int[n_global+1];    
+    inFile.read((char *) (*rowPtr), (n_global+1)*sizeof(unsigned int));
 
-    (*val)    = (real *) malloc( (*nnz_global) * sizeof(real)); 
-    // reading val vector (nnz) values //
-    
-    if (sizeof(real) == sizeof(double)) {
-        if ( !fread(*val, sizeof(real), (size_t) (*nnz_global), filePtr)) exit(0);
+    // allocating and reading colIdx //    
+    (*colIdx) = new unsigned int[nnz_global];    
+    inFile.read((char *) (*colIdx), (nnz_global)*sizeof(unsigned int));
+
+    // allocating and reading val //    
+    (*val) = new floatType[nnz_global];
+    if (sizeof(floatType) == sizeof(double)) {
+      inFile.read((char *) (*val), (nnz_global)*sizeof(double));
+      //inFile.read((char *) &nnzPerRow, sizeof(double));
+      //inFile.read((char *) &stdDev, sizeof(double));
     } else {
-        double *temp = (double *) malloc(*nnz_global*sizeof(double)); 
-        if ( !fread(temp, sizeof(double), (size_t) (*nnz_global), filePtr)) exit(0);
-        for (int i=0; i<*nnz_global; i++) {
-            (*val)[i] = (float) temp[i];
-        } // end for //    
-        free(temp);
+      double temp;
+      for (int i=0; i<nnz_global; ++i) {
+        inFile.read((char *) &temp, sizeof(double));
+        (*val)[i] = static_cast<floatType>(temp);
+      } // end for //
+      //inFile.read((char *) &temp, sizeof(double));
+      //nnzPerRow = static_cast<floatType>(temp);
+      //inFile.read((char *) &temp, sizeof(double));
+      //stdDev = static_cast<floatType>(temp);
     } // end if //
-
+/*      
+    auto meanAndSd = [] (const unsigned int *__restrict__ const data, const floatType &mean, const int &n) -> floatType 
+    {    
+      floatType standardDeviation = static_cast<floatType>(0);
+      for(int row=0; row<n; ++row) {
+          standardDeviation += pow( (data[row+1] - data[row]) - mean, 2);
+      } // end for //
+      return sqrt(standardDeviation/n);
+    }; // end of meanAndSd() lambda function;
     
-    fclose(filePtr);
+    nnzPerRow = static_cast<floatType>(nnz_global)/n_global;
+    stdDev = meanAndSd((*rowPtr),nnzPerRow, n_global );
+*/    
+    inFile.close();    
 } // end of reader //
