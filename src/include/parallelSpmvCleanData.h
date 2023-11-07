@@ -6,6 +6,7 @@
     cudaFree(cols_d);
     cudaFree(rows_d);
 /////////////// end  de-allocating device memory //////////////////////////
+    delete[] toSortStream;
     delete[] starRowStream;
     delete[] sharedMemorySize;   
     for (int s=0; s<nStreams; ++s) {

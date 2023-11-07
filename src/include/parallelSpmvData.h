@@ -24,5 +24,8 @@
     floatType *w_d = nullptr;
 
     size_t *sharedMemorySize=nullptr;
-
+    struct str *toSortStream=nullptr;
+    
+    bool sort = false;
+    bool ascen = false;
     // end of data for solution

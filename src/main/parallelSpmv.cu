@@ -19,6 +19,28 @@ using ns = std::chrono::nanoseconds;
 #define MAXTHREADS 256
 #define REP 1000
 
+struct str
+{
+    int value;
+    unsigned int index;
+};
+
+int ascending(const void *a, const void *b)
+{
+    struct str *a1 = (struct str *)a;
+    struct str *a2 = (struct str *)b;
+    
+    return ( (*a2).value - (*a1).value );
+} // end ascending() //
+
+int descending(const void *a, const void *b)
+{
+    struct str *a1 = (struct str *)a;
+    struct str *a2 = (struct str *)b;
+    
+    return ( (*a1).value - (*a2).value );
+} // end descending() //
+
 
 
   auto meanAndSd = [] (floatType &mean, floatType &sd, const unsigned int *__restrict__ const data,  const unsigned int &n) -> void 
@@ -53,7 +75,7 @@ int main(int argc, char *argv[])
     auto checkSol=false;
 
     if (argc < 3 ) {
-        cout << "Use: " <<  argv[0] <<   " Matrix_filename InputVector_filename  [SolutionVector_filename  [# of streams] ]\n";
+        cout << "Use: " <<  argv[0] <<   " Matrix_filename InputVector_filename  [SolutionVector_filename  [# of streams ['+'| '-'] ] ]\n";
         exit(-1);
     } // endif //
 
@@ -90,7 +112,13 @@ int main(int argc, char *argv[])
         cout << "Quitting.....\n";
         exit(0);
     } // end if //
-    
+
+    if (argc >4 ) { 
+      if (strcmp(argv[4],"+") == 0  or strcmp(argv[4],"-") == 0) {
+        sort=true;
+        if (strcmp(argv[4],"+") == 0) ascen=true;
+      } // end if //
+    } // end if //
     // reading basic matrix data
     reader(n_global,nnz_global, &row_ptr,&col_idx,&val,argv[1]);
     // end of reading basic matrix data
@@ -111,8 +139,8 @@ int main(int argc, char *argv[])
   if (temp >1) nRowBlocks = temp;
 
   // the value of  nRowBlocks can be forced by run-time paramenter   
-  if (argc  > 4  && atoi(argv[4]) > 0) {
-      nRowBlocks = atoi(argv[4]);
+  if (argc > 5  && atoi(argv[5]) > 0) {
+      nRowBlocks = atoi(argv[5]);
   } // end if //  
   if (nRowBlocks > n_global) nRowBlocks = n_global;
   
@@ -245,8 +273,36 @@ int main(int argc, char *argv[])
     } // end for //
 
 
+
+
+// sorting before execution by block size or nonzeros
+
+  if (sort) {
+    toSortStream = new struct str [nStreams];
     for (int s=0; s<nStreams; ++s) {
-        int nrows = starRowStream[s+1]-starRowStream[s];
+        toSortStream[s].index = s;
+        
+        // sorting by block size
+        toSortStream[s].value=block[s].x;
+        
+        // sorting by non-zeros size
+        //toSortStream[s].value = row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]];
+        
+    } // end for //
+      if (ascen) {
+        qsort(toSortStream, nStreams, sizeof(toSortStream[0]), ascending);
+      } else {
+        qsort(toSortStream, nStreams, sizeof(toSortStream[0]), descending);
+      } // end if //
+  } // end if //
+    
+    
+    
+// end of sorting before execution by block size or nonzeros
+
+
+    for (unsigned int s=0; s<nStreams; ++s) {
+        unsigned int nrows = starRowStream[s+1]-starRowStream[s];
         //printf("file: %s, line: %d, using vector spmv for on matrix,  nrows: %d \n",  __FILE__, __LINE__, nrows ) ;
         grid[s].x = ( (nrows + block[s].y - 1) / block[s].y ) ;
         sharedMemorySize[s]=block[s].x*block[s].y*sizeof(floatType);
@@ -261,19 +317,23 @@ int main(int argc, char *argv[])
                                row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]] );
 
 */  
-        cout << "\tblock for stream " << s
+        unsigned int ss=s;
+        if (sort) {
+          ss = toSortStream[s].index;
+        }  // end if //
+        cout << "\tblock for stream " << ss
              << "\thas size: [" 
-             << block[s].y
+             << block[ss].y
              << ", " 
-             << block[s].x
+             << block[ss].x
              << "],\t  and its grid has size: [" 
-             << grid[s].x*block[s].y  
+             << grid[ss].x*block[ss].y  
              << ", "
-             << grid[s].y*block[s].x
+             << grid[ss].y*block[ss].x
              << "],\t " 
-             << starRowStream[s+1]-starRowStream[s]
+             << starRowStream[ss+1]-starRowStream[ss]
              << " rows and "
-             << row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]]
+             << row_ptr[starRowStream[ss+1]] - row_ptr[starRowStream[ss]]
              << " non-zeros.\n";             
 
         
@@ -371,7 +431,11 @@ int main(int argc, char *argv[])
         //cuda_ret = cudaMemset(w_d, 0, (size_t) n_global*sizeof(floatType) );
         //if(cuda_ret != cudaSuccess) FATAL("Unable to set device for matrix w_d");
         
-        for (int s=0; s<nStreams; ++s) {
+        for (unsigned int ss=0; ss<nStreams; ++ss) {
+            unsigned int s=ss;
+            if (sort) {
+              s = toSortStream[ss].index;
+            }  // end if //
             const int sRow = starRowStream[s];
             const int nrows = starRowStream[s+1]-starRowStream[s];
             #ifdef USE_TEXTURE
