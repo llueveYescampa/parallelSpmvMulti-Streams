@@ -9,12 +9,6 @@ using std::ios;
 using ns = std::chrono::nanoseconds;
 
 #include "parallelSpmv.h"
-/*
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-*/
-#include <sys/time.h>
 
 #define FATAL(msg) \
     do {\
@@ -24,6 +18,8 @@ using ns = std::chrono::nanoseconds;
 
 #define MAXTHREADS 256
 #define REP 1000
+
+
 
   auto meanAndSd = [] (floatType &mean, floatType &sd, const unsigned int *__restrict__ const data,  const unsigned int &n) -> void 
   {
@@ -248,6 +244,7 @@ int main(int argc, char *argv[])
         } // end if //
     } // end for //
 
+
     for (int s=0; s<nStreams; ++s) {
         int nrows = starRowStream[s+1]-starRowStream[s];
         //printf("file: %s, line: %d, using vector spmv for on matrix,  nrows: %d \n",  __FILE__, __LINE__, nrows ) ;
@@ -263,17 +260,17 @@ int main(int argc, char *argv[])
                                starRowStream[s+1]-starRowStream[s],
                                row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]] );
 
-*/
+*/  
         cout << "\tblock for stream " << s
-             << " has size: [" 
+             << "\thas size: [" 
              << block[s].y
              << ", " 
              << block[s].x
-             << "],  and its grid has size: [" 
+             << "],\t  and its grid has size: [" 
              << grid[s].x*block[s].y  
              << ", "
              << grid[s].y*block[s].x
-             << "], " 
+             << "],\t " 
              << starRowStream[s+1]-starRowStream[s]
              << " rows and "
              << row_ptr[starRowStream[s+1]] - row_ptr[starRowStream[s]]
