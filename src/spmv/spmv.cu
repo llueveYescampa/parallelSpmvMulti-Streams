@@ -29,15 +29,15 @@
 #endif
 
 template <const unsigned int bs>
-__device__ void warpReduce(volatile floatType * const temp1, const unsigned int sharedMemIndx)
+__device__ void warpReduce(volatile floatType * const temp1)
 {
     // unrolling warp 
-    if (bs >= 64) temp1[sharedMemIndx] += temp1[sharedMemIndx + 32];
-    if (bs >= 32) temp1[sharedMemIndx] += temp1[sharedMemIndx + 16];
-    if (bs >= 16) temp1[sharedMemIndx] += temp1[sharedMemIndx +  8];
-    if (bs >=  8) temp1[sharedMemIndx] += temp1[sharedMemIndx +  4];
-    if (bs >=  4) temp1[sharedMemIndx] += temp1[sharedMemIndx +  2];
-    if (bs >=  2) temp1[sharedMemIndx] += temp1[sharedMemIndx +  1];
+    if (bs >= 64) temp1[0] += temp1[32];
+    if (bs >= 32) temp1[0] += temp1[16];
+    if (bs >= 16) temp1[0] += temp1[ 8];
+    if (bs >=  8) temp1[0] += temp1[ 4];
+    if (bs >=  4) temp1[0] += temp1[ 2];
+    if (bs >=  2) temp1[0] += temp1[ 1];
 } // end of warpReduce() //
 
 __global__ 
@@ -92,7 +92,7 @@ void spmv(       floatType *__restrict__       y,
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
                 } // end for //
-                if (threadIdx.x <  1) warpReduce< 2>(temp,sharedMemIndx);
+                if (threadIdx.x <  1) warpReduce< 2>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -107,7 +107,7 @@ void spmv(       floatType *__restrict__       y,
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
                 } // end for //
-                if (threadIdx.x <  2) warpReduce< 4>(temp,sharedMemIndx);
+                if (threadIdx.x <  2) warpReduce< 4>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -122,7 +122,7 @@ void spmv(       floatType *__restrict__       y,
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
                 } // end for //
-                if (threadIdx.x <  4) warpReduce< 8>(temp,sharedMemIndx);
+                if (threadIdx.x <  4) warpReduce< 8>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -137,7 +137,7 @@ void spmv(       floatType *__restrict__       y,
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
                 } // end for //
-                if (threadIdx.x <  8) warpReduce<16>(temp,sharedMemIndx);
+                if (threadIdx.x <  8) warpReduce<16>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -152,7 +152,7 @@ void spmv(       floatType *__restrict__       y,
                     temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
                     #endif
                 } // end for //
-                if (threadIdx.x < 16) warpReduce<32>(temp,sharedMemIndx);
+                if (threadIdx.x < 16) warpReduce<32>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -168,7 +168,7 @@ void spmv(       floatType *__restrict__       y,
                     #endif
                 } // end for //
                __syncthreads();
-                if (threadIdx.x < 32) warpReduce<64>(temp,sharedMemIndx);
+                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -185,7 +185,7 @@ void spmv(       floatType *__restrict__       y,
                 } // end for //
                __syncthreads();
                 if (threadIdx.x < 64) { temp[sharedMemIndx] += temp[sharedMemIndx +  64]; __syncthreads(); }
-                if (threadIdx.x < 32) warpReduce<64>(temp,sharedMemIndx);
+                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -203,7 +203,7 @@ void spmv(       floatType *__restrict__       y,
                __syncthreads();
                 if (threadIdx.x<128) { temp[sharedMemIndx] += temp[sharedMemIndx + 128]; __syncthreads(); }
                 if (threadIdx.x< 64) { temp[sharedMemIndx] += temp[sharedMemIndx +  64]; __syncthreads(); }
-                if (threadIdx.x < 32) warpReduce<64>(temp,sharedMemIndx);
+                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
@@ -222,7 +222,7 @@ void spmv(       floatType *__restrict__       y,
                 if (threadIdx.x<256) { temp[sharedMemIndx] += temp[sharedMemIndx + 256]; __syncthreads(); }
                 if (threadIdx.x<128) { temp[sharedMemIndx] += temp[sharedMemIndx + 128]; __syncthreads(); }
                 if (threadIdx.x< 64) { temp[sharedMemIndx] += temp[sharedMemIndx +  64]; __syncthreads(); }
-                if (threadIdx.x < 32) warpReduce<64>(temp,sharedMemIndx);
+                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
 
                 if ((sharedMemIndx % blockDim.x)  == 0) {
                     //y[row] += temp[sharedMemIndx];
