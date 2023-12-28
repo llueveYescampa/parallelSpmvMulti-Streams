@@ -379,6 +379,7 @@ int main(int argc, char *argv[])
 
     cuda_ret = cudaMemcpy(v_d, v, (n_global)*sizeof(floatType),cudaMemcpyHostToDevice);
     if(cuda_ret != cudaSuccess) FATAL("Unable to copy memory to device matrix x_d");
+    cudaDeviceSynchronize();
 
 /////////////// end of  copying memory to device  //////////////////////////
 
