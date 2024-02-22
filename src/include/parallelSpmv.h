@@ -24,24 +24,24 @@
     
     __global__ 
     #ifdef USE_TEXTURE
-        void spmv(      floatType *__restrict__       y, 
-                         cudaTextureObject_t    xTex, 
-                  const floatType *__restrict__ const val,  
+        void spmv(      floatType *__restrict__           y, 
+                         cudaTextureObject_t              xTex, 
+                  const floatType     *__restrict__ const val,  
                   const unsigned int  *__restrict__ const row_ptr, 
                   const unsigned int  *__restrict__ const col_idx, 
-                  const unsigned int nRows,
-                  const floatType alpha,
-                  const floatType beta
+                  const unsigned int                      nRows,
+                  const floatType                         alpha,
+                  const floatType                         beta
                   );
     #else
-        void spmv(      floatType *__restrict__      y, 
-                  const floatType *__restrict__ const x,
-                  const floatType *__restrict__ const val,  
+        void spmv(      floatType     *__restrict__       y, 
+                  const floatType     *__restrict__ const x,
+                  const floatType     *__restrict__ const val,  
                   const unsigned int  *__restrict__ const row_ptr, 
                   const unsigned int  *__restrict__ const col_idx, 
-                  const unsigned int nRows,
-                  const floatType alpha,
-                  const floatType beta
+                  const unsigned int                      nRows,
+                  const floatType                         alpha,
+                  const floatType                         beta
                   );
                   
     #endif
