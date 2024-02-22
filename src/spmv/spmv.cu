@@ -32,77 +32,80 @@ template <const unsigned int bs>
 __device__ void warpReduce(volatile floatType * const temp1)
 {
     // unrolling warp 
-    if (bs >= 64) temp1[0] += temp1[32];
-    if (bs >= 32) temp1[0] += temp1[16];
-    if (bs >= 16) temp1[0] += temp1[ 8];
-    if (bs >=  8) temp1[0] += temp1[ 4];
-    if (bs >=  4) temp1[0] += temp1[ 2];
-    if (bs >=  2) temp1[0] += temp1[ 1];
+    if (bs >= 32) temp1[0] += temp1[32];
+    if (bs >= 16) temp1[0] += temp1[16];
+    if (bs >=  8) temp1[0] += temp1[ 8];
+    if (bs >=  4) temp1[0] += temp1[ 4];
+    if (bs >=  2) temp1[0] += temp1[ 2];
+    if (bs >=  1) temp1[0] += temp1[ 1];
 } // end of warpReduce() //
 
 __global__ 
 #ifdef USE_TEXTURE
-void spmv(       floatType *__restrict__       y,
-                 cudaTextureObject_t    xTex, 
-           const floatType *__restrict__ const val, 
+void spmv(       floatType *__restrict__           y,
+                 cudaTextureObject_t               xTex, 
+           const floatType     *__restrict__ const val, 
            const unsigned int  *__restrict__ const row_ptr, 
            const unsigned int  *__restrict__ const col_idx, 
-           const unsigned int nRows,
-           const floatType alpha,
-           const floatType beta
+           const unsigned int                      nRows,
+           const floatType                         alpha,
+           const floatType                         beta
           )
 #else
-void spmv(       floatType *__restrict__       y, 
-           const floatType *__restrict__ const x, 
-           const floatType *__restrict__ const val, 
+void spmv(       floatType     *__restrict__       y, 
+           const floatType     *__restrict__ const x, 
+           const floatType     *__restrict__ const val, 
            const unsigned int  *__restrict__ const row_ptr, 
            const unsigned int  *__restrict__ const col_idx, 
-           const unsigned int nRows,
-           const floatType alpha,
-           const floatType beta
+           const unsigned int                      nRows,
+           const floatType                         alpha,
+           const floatType                         beta
           )
 #endif
 {   
     extern __shared__ floatType temp[];
     const int row = blockIdx.x*blockDim.y + threadIdx.y;
     const unsigned int sharedMemIndx = blockDim.x*threadIdx.y + threadIdx.x;
-    temp[sharedMemIndx] = static_cast<floatType>(0.0);
+    auto sum = static_cast<floatType>(0.0);
 
     if (row < nRows) {
         for (int col=row_ptr[row]+threadIdx.x; col < row_ptr[row+1]; col+=blockDim.x) {
           #ifdef USE_TEXTURE
-          temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
+          sum += (val[col] * fetch_floatType( xTex, col_idx[col]));
+          //temp[sharedMemIndx] += (val[col] * fetch_floatType( xTex, col_idx[col]));
           #else
-          temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
+          sum += (val[col] * x[col_idx[col]]);
+          //temp[sharedMemIndx] += (val[col] * x[col_idx[col]]);
           #endif
         } // end for //
+        temp[sharedMemIndx] = sum;
 
         switch(blockDim.x) {
             case 2  :
-                if (threadIdx.x <  1) warpReduce< 2>(&temp[sharedMemIndx]);
+                if (threadIdx.x <  1) warpReduce< 1>(&temp[sharedMemIndx]);
                 break; 
             case 4  :
-                if (threadIdx.x <  2) warpReduce< 4>(&temp[sharedMemIndx]);
+                if (threadIdx.x <  2) warpReduce< 2>(&temp[sharedMemIndx]);
                 break; 
             case 8  :
-                if (threadIdx.x <  4) warpReduce< 8>(&temp[sharedMemIndx]);
+                if (threadIdx.x <  4) warpReduce< 4>(&temp[sharedMemIndx]);
                 break; 
             case 16  :
-                if (threadIdx.x <  8) warpReduce<16>(&temp[sharedMemIndx]);
+                if (threadIdx.x <  8) warpReduce< 8>(&temp[sharedMemIndx]);
                 break;
             case 32  :
-                if (threadIdx.x < 16) warpReduce<32>(&temp[sharedMemIndx]);
+                if (threadIdx.x < 16) warpReduce<16>(&temp[sharedMemIndx]);
                 break; 
             case 64  :
                __syncthreads();
-                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
+                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
                 break; 
             case 128  :
                __syncthreads();
                 if (threadIdx.x < 64) temp[sharedMemIndx] += temp[sharedMemIndx +  64];
                 
                 __syncthreads();
-                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
+                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
                 break; 
             case 256  :
                __syncthreads();
@@ -112,7 +115,7 @@ void spmv(       floatType *__restrict__       y,
                 if (threadIdx.x< 64) temp[sharedMemIndx] += temp[sharedMemIndx +  64]; 
                 
                 __syncthreads();
-                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
+                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
                 break; 
             case 512  :
                __syncthreads();
@@ -125,7 +128,7 @@ void spmv(       floatType *__restrict__       y,
                 if (threadIdx.x< 64) temp[sharedMemIndx] += temp[sharedMemIndx +  64]; 
                 
                 __syncthreads();
-                if (threadIdx.x < 32) warpReduce<64>(&temp[sharedMemIndx]);
+                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
                 break; 
         } // end switch //
         if ( (sharedMemIndx % blockDim.x)  == 0) {
