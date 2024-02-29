@@ -28,18 +28,6 @@
     #endif
 #endif
 
-template <const unsigned int bs>
-__device__ void warpReduce(volatile floatType * const temp1)
-{
-    // unrolling warp 
-    if (bs >= 32) temp1[0] += temp1[32];
-    if (bs >= 16) temp1[0] += temp1[16];
-    if (bs >=  8) temp1[0] += temp1[ 8];
-    if (bs >=  4) temp1[0] += temp1[ 4];
-    if (bs >=  2) temp1[0] += temp1[ 2];
-    if (bs >=  1) temp1[0] += temp1[ 1];
-} // end of warpReduce() //
-
 __global__ 
 #ifdef USE_TEXTURE
 void spmv(       floatType *__restrict__           y,
@@ -81,55 +69,41 @@ void spmv(       floatType     *__restrict__       y,
         temp[sharedMemIndx] = sum;
 
         switch(blockDim.x) {
-            case 2  :
-                if (threadIdx.x <  1) warpReduce< 1>(&temp[sharedMemIndx]);
-                break; 
-            case 4  :
-                if (threadIdx.x <  2) warpReduce< 2>(&temp[sharedMemIndx]);
-                break; 
-            case 8  :
-                if (threadIdx.x <  4) warpReduce< 4>(&temp[sharedMemIndx]);
-                break; 
-            case 16  :
-                if (threadIdx.x <  8) warpReduce< 8>(&temp[sharedMemIndx]);
-                break;
-            case 32  :
-                if (threadIdx.x < 16) warpReduce<16>(&temp[sharedMemIndx]);
-                break; 
-            case 64  :
+        /*
+            case 1024  :
                __syncthreads();
-                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
-                break; 
-            case 128  :
-               __syncthreads();
-                if (threadIdx.x < 64) temp[sharedMemIndx] += temp[sharedMemIndx +  64];
-                
-                __syncthreads();
-                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
-                break; 
-            case 256  :
-               __syncthreads();
-                if (threadIdx.x<128) temp[sharedMemIndx] += temp[sharedMemIndx + 128]; 
-                
-                __syncthreads();
-                if (threadIdx.x< 64) temp[sharedMemIndx] += temp[sharedMemIndx +  64]; 
-                
-                __syncthreads();
-                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
-                break; 
+                if (threadIdx.x<512) temp[sharedMemIndx] += temp[sharedMemIndx + 512]; 
+         */
             case 512  :
                __syncthreads();
                 if (threadIdx.x<256) temp[sharedMemIndx] += temp[sharedMemIndx + 256]; 
                 
-                __syncthreads();
+            case 256  :
+               __syncthreads();
                 if (threadIdx.x<128) temp[sharedMemIndx] += temp[sharedMemIndx + 128]; 
                 
-                __syncthreads();
-                if (threadIdx.x< 64) temp[sharedMemIndx] += temp[sharedMemIndx +  64]; 
+            case 128  :
+               __syncthreads();
+                if (threadIdx.x < 64) temp[sharedMemIndx] += temp[sharedMemIndx +  64];
                 
-                __syncthreads();
-                if (threadIdx.x < 32) warpReduce<32>(&temp[sharedMemIndx]);
-                break; 
+            case 64  :
+               __syncthreads();
+                if (threadIdx.x < 32)  temp[sharedMemIndx] += temp[sharedMemIndx + 32];
+                
+            case 32  :
+                if (threadIdx.x < 16)  temp[sharedMemIndx] += temp[sharedMemIndx + 16];
+                
+            case 16  :
+                if (threadIdx.x <  8)  temp[sharedMemIndx] += temp[sharedMemIndx +  8];
+        
+            case 8  :
+                if (threadIdx.x <  4)  temp[sharedMemIndx] += temp[sharedMemIndx +  4];
+                
+            case 4  :
+                if (threadIdx.x <  2)  temp[sharedMemIndx] += temp[sharedMemIndx +  2];
+
+            case 2  :
+                if (threadIdx.x <  1)  temp[sharedMemIndx] += temp[sharedMemIndx +  1];
         } // end switch //
         if ( (sharedMemIndx % blockDim.x)  == 0) {
             //y[row] += temp[sharedMemIndx];
